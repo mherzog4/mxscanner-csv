@@ -110,4 +110,4 @@ npm run build
 
 ## Privacy
 
-The app processes uploaded CSVs transiently. The MVP does not persist uploaded files or raw email addresses. Resend receives the submitter email and the enriched CSV attachment so it can deliver the report.
+The app processes uploaded CSVs transiently. It does not persist uploaded files or the email addresses contained in them. Resend receives the submitter email and the enriched CSV attachment so it can deliver the report, and the submitter email is stored as a contact in a Resend audience for product follow-up (when `RESEND_AUDIENCE_ID` is configured).

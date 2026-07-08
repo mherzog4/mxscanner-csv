@@ -1,11 +1,14 @@
+import { checkBotId } from "botid/server";
 import { NextResponse } from "next/server";
 import { buildEnrichedCsv, getUniqueDomains, parseCsv } from "@/lib/csv-enrichment";
 import { scanDomains } from "@/lib/dns-google";
-import { sendReportEmail } from "@/lib/email";
+import { addContact, sendReportEmail } from "@/lib/email";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Worst case: 500 domains / 20 concurrency * 10s DNS timeout ≈ 250s. If
+// MAX_UNIQUE_DOMAINS grows past this budget, move the scan to a background job.
+export const maxDuration = 300;
 
 const MAX_FILE_BYTES = 1_000_000;
 const MAX_ROWS = 5_000;
@@ -14,7 +17,12 @@ const SCAN_CONCURRENCY = 20;
 
 export async function POST(request: Request) {
   try {
-    const rateLimit = checkRateLimit(`scan:${getClientIp(request)}`, 5, 60 * 60 * 1000);
+    const { isBot } = await checkBotId();
+    if (isBot) {
+      return NextResponse.json({ error: "Automated requests are not allowed." }, { status: 403 });
+    }
+
+    const rateLimit = await checkRateLimit(`scan:${getClientIp(request)}`, 5, 60 * 60 * 1000);
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: "Too many scans from this network. Try again later." }, { status: 429 });
     }
@@ -25,6 +33,11 @@ export async function POST(request: Request) {
 
     if (!/^\S+@\S+\.\S+$/.test(email)) {
       return NextResponse.json({ error: "Enter a valid delivery email." }, { status: 400 });
+    }
+
+    const recipientLimit = await checkRateLimit(`report:${email.toLowerCase()}`, 3, 24 * 60 * 60 * 1000);
+    if (!recipientLimit.allowed) {
+      return NextResponse.json({ error: "This email already received the maximum reports for today." }, { status: 429 });
     }
 
     if (!(file instanceof File)) {
@@ -70,14 +83,16 @@ export async function POST(request: Request) {
       summary: enriched.summary,
     });
 
+    await addContact(email);
+
     return NextResponse.json({
       ok: true,
       messageId: emailResult?.id,
       summary: enriched.summary,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unexpected scan error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Scan failed:", error);
+    return NextResponse.json({ error: "Unexpected scan error. Try again." }, { status: 500 });
   }
 }
 

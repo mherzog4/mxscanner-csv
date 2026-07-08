@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildEnrichedCsv, getUniqueDomains, parseCsv } from "./csv-enrichment";
+import { buildEnrichedCsv, getUniqueDomains, parseCsv, sanitizeCell } from "./csv-enrichment";
 import type { DomainScanResult } from "./types";
 
 const proofpointResult: DomainScanResult = {
@@ -42,5 +42,28 @@ describe("csv enrichment", () => {
     expect(output.csv).toContain("Invalid or missing email");
     expect(output.csv).toContain("mx_provider_evidence");
     expect(output.csv).toContain("Proofpoint high MX: 10 mxa-001.pphosted.com");
+  });
+
+  it("neutralizes formula-injection cells in output", async () => {
+    const hostile: DomainScanResult = {
+      ...proofpointResult,
+      domain: "evil.com",
+      spf: { status: "present", records: ['=HYPERLINK("http://evil.com","click")'] },
+    };
+    const parsed = await parseCsv("first_name,email\n=cmd|calc,jane@evil.com\n");
+    const output = await buildEnrichedCsv(parsed, new Map([["evil.com", hostile]]));
+
+    expect(output.csv).toContain("'=cmd|calc");
+    expect(output.csv).toContain("'=HYPERLINK");
+    expect(output.csv).not.toMatch(/(^|,)"?=HYPERLINK/m);
+  });
+
+  it("sanitizes only formula-trigger prefixes", () => {
+    expect(sanitizeCell("=SUM(A1)")).toBe("'=SUM(A1)");
+    expect(sanitizeCell("+1 555")).toBe("'+1 555");
+    expect(sanitizeCell("@user")).toBe("'@user");
+    expect(sanitizeCell("jane@example.com")).toBe("jane@example.com");
+    expect(sanitizeCell("plain")).toBe("plain");
+    expect(sanitizeCell("")).toBe("");
   });
 });

@@ -17,8 +17,12 @@ export async function sendReportEmail({
     throw new Error("RESEND_API_KEY is not configured");
   }
 
+  if (!process.env.EMAIL_FROM) {
+    throw new Error("EMAIL_FROM is not configured");
+  }
+
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const from = process.env.EMAIL_FROM || "MX Scanner <onboarding@resend.dev>";
+  const from = process.env.EMAIL_FROM;
   const providerRows = Object.entries(summary.providerCounts)
     .sort(([, a], [, b]) => b - a)
     .map(([provider, count]) => `<tr><td>${escapeHtml(provider)}</td><td>${count}</td></tr>`)
@@ -53,6 +57,17 @@ export async function sendReportEmail({
 
   if (error) throw new Error(error.message);
   return data;
+}
+
+export async function addContact(email: string) {
+  const audienceId = process.env.RESEND_AUDIENCE_ID;
+  if (!process.env.RESEND_API_KEY || !audienceId) return;
+
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const { error } = await resend.contacts.create({ email, audienceId });
+  if (error) {
+    console.error("Failed to add contact to Resend audience:", error.message);
+  }
 }
 
 function escapeHtml(value: string) {

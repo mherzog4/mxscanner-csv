@@ -155,6 +155,15 @@ function getEmailValue(row: Record<string, string>, headers: string[], emailColu
   return undefined;
 }
 
+// Excel/Sheets execute cells starting with these as formulas. Cell values here
+// include DNS TXT records controlled by scanned third parties, so every output
+// cell gets neutralized (OWASP CSV-injection guidance).
+const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
+
+export function sanitizeCell(value: string) {
+  return FORMULA_TRIGGER.test(value) ? `'${value}` : value;
+}
+
 function formatRows(headers: string[], rows: Record<string, string>[]) {
   return new Promise<string>((resolve, reject) => {
     let csv = "";
@@ -164,7 +173,9 @@ function formatRows(headers: string[], rows: Record<string, string>[]) {
       csv += chunk.toString("utf8");
     });
     stream.on("end", () => resolve(csv));
-    for (const row of rows) stream.write(row);
+    for (const row of rows) {
+      stream.write(Object.fromEntries(Object.entries(row).map(([key, value]) => [key, sanitizeCell(value ?? "")])));
+    }
     stream.end();
   });
 }
