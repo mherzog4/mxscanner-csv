@@ -1,0 +1,77 @@
+package-lock.json
+  s_086d603e2576ef::t_53ff4fafd54c8a 1-2572
+package.json
+  s_086d603e2576ef::t_ab58423a4d1b32 1-31
+src/app/page.tsx
+  s_bc145b22362896::t_e6f222b467fe39 1-46
+src/app/styles.css
+  s_bc145b22362896::t_0afaf054fd3f49 1-392
+.env.example
+  s_086d603e2576ef::t_debd70cc4759d7 1-3
+.gitignore
+  s_086d603e2576ef::t_a708aff97ad6e9 1-7
+CONTRIBUTING.md
+  s_086d603e2576ef::t_82732e00eaed2f 1-44
+LICENSE
+  s_086d603e2576ef::t_b2f90ed5b40093 1-21
+PRD.md
+  s_086d603e2576ef::t_658a9eb57ee351 1-639
+README.md
+  s_086d603e2576ef::t_78e61c1f32786b 1-113
+next-env.d.ts
+  s_086d603e2576ef::t_f0a3b5f1634349 1-6
+next.config.ts
+  s_086d603e2576ef::t_9e659c8d4d8c44 1-9
+src/app/api/scan/route.ts
+  s_086d603e2576ef::t_e67848a5456145 1-88
+src/app/layout.tsx
+  s_086d603e2576ef::t_8d582c84fe72b9 1-26
+src/app/upload-form.tsx
+  s_086d603e2576ef::t_ecbbbc95f12d3e 1-55
+src/lib/csv-enrichment.test.ts
+  s_086d603e2576ef::t_21f8aed625a119 1-46
+src/lib/csv-enrichment.ts
+  s_086d603e2576ef::t_128157473af4cb 1-170
+src/lib/detect-providers.test.ts
+  s_086d603e2576ef::t_aea9c41e8960af 1-33
+src/lib/detect-providers.ts
+  s_086d603e2576ef::t_94f6f4e8ec82df 1-82
+src/lib/dns-google.ts
+  s_086d603e2576ef::t_ed1c4e458f01c1 1-131
+src/lib/email.ts
+  s_086d603e2576ef::t_58217dd61e1759 1-65
+src/lib/provider-rules.ts
+  s_086d603e2576ef::t_8b90e2e1278032 1-133
+src/lib/rate-limit.ts
+  s_086d603e2576ef::t_0a091c440ccb48 1-27
+src/lib/types.ts
+  s_086d603e2576ef::t_1a26896b3cf8ee 1-63
+tsconfig.json
+  s_086d603e2576ef::t_151f84fc6cbf49 1-41
+vitest.config.ts
+  s_086d603e2576ef::t_50c63a23aee8b7 1-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "220c76796605546b0f41c813d106fe027843daa7",
+  "prompts": {},
+  "sessions": {
+    "s_086d603e2576ef": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f05177b9-d75e-490b-b159-21f4cfcf5773",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Mherzog4 <matthewherzog4@gmail.com>"
+    },
+    "s_bc145b22362896": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6a20608f-d260-4dff-aeef-c1f17566da02",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Mherzog4 <matthewherzog4@gmail.com>"
+    }
+  }
+}
