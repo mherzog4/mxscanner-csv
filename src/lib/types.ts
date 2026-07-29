@@ -78,6 +78,7 @@ export type EnrichmentSummary = {
   totalValidEmails: number;
   totalUniqueDomains: number;
   providerCounts: Record<string, number>;
+  mailboxCounts: Record<string, number>;
   unknownDomains: number;
   deliverability: {
     dmarcEnforced: number;

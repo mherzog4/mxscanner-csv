@@ -39,10 +39,15 @@ export function detectProviders(mxRecords: string[], txtRecords: string[]): Emai
       for (const pattern of rule.mxPatterns ?? []) {
         if (!includesPattern(record, pattern)) continue;
 
-        const category = rule.categories.includes("seg") ? "seg" : rule.categories[0];
-        const next = toDetection(rule, category, "MX", record, pattern);
-        const key = `${rule.id}:${category}`;
-        byKey.set(key, mergeDetection(byKey.get(key), next));
+        // MX is the strongest signal, so it earns every role the rule claims
+        // except outbound_sender — inbound routing says nothing about who is
+        // authorized to send. Microsoft 365 is both a gateway and a mailbox, and
+        // reporting it as only one of the two under-counts the other.
+        for (const category of rule.categories.filter((c) => c !== "outbound_sender")) {
+          const next = toDetection(rule, category, "MX", record, pattern);
+          const key = `${rule.id}:${category}`;
+          byKey.set(key, mergeDetection(byKey.get(key), next));
+        }
       }
     }
 
@@ -61,6 +66,8 @@ export function detectProviders(mxRecords: string[], txtRecords: string[]): Emai
       for (const pattern of rule.spfIncludePatterns ?? []) {
         if (!includesPattern(record, pattern)) continue;
 
+        // Deliberately narrow: an SPF include authorizes sending and must never
+        // promote a provider to inbound gateway or mailbox on its own.
         const category = rule.categories.includes("outbound_sender") ? "outbound_sender" : rule.categories[0];
         const next = toDetection(rule, category, "SPF", record, pattern);
         const key = `${rule.id}:${category}`;
