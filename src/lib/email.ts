@@ -11,6 +11,7 @@ const REPLY_TO = process.env.EMAIL_REPLY_TO;
 
 const LINKEDIN_URL = "https://www.linkedin.com/in/mtmherzog";
 const X_URL = "https://x.com/mattherzogx";
+const SITE_URL = "https://mattherzog.xyz";
 
 export async function sendReportEmail({
   to,
@@ -56,7 +57,8 @@ export async function sendReportEmail({
       <p style="color:#6b7280; font-size: 13px;">
         Questions, or a provider we misread? This address doesn't take replies —
         reach me on <a href="${LINKEDIN_URL}" style="color:#1f6f4a;">LinkedIn</a>
-        or <a href="${X_URL}" style="color:#1f6f4a;">X</a>.
+        or <a href="${X_URL}" style="color:#1f6f4a;">X</a>, or see more at
+        <a href="${SITE_URL}" style="color:#1f6f4a;">mattherzog.xyz</a>.
       </p>
     </div>
   `;

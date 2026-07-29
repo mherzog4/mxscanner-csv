@@ -1,4 +1,4 @@
-import { FlowDiagram } from "./how-it-works/flow-diagram";
+import { FlowDiagram } from "./flow-diagram";
 import { UploadForm } from "./upload-form";
 
 export default function Home() {
@@ -46,7 +46,8 @@ export default function Home() {
 
       <footer>
         <span>
-          <a href="/how-it-works">How it works</a> · <a href={githubUrl}>Open-source on GitHub</a>
+          <a href="#how-it-works">How it works</a> · <a href={githubUrl}>Open-source on GitHub</a> · built by{" "}
+          <a href="https://mattherzog.xyz">Matt Herzog</a>
         </span>
         <span>DNS evidence only. Prefer unknown over incorrect.</span>
       </footer>
