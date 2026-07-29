@@ -1,0 +1,33 @@
+src/lib/dns.ts
+  s_2eadf031bf0ea9::t_7462e08815d7c0 228-255,257,265-269
+src/lib/dns.test.ts
+  s_2eadf031bf0ea9::t_d2fb4555447471 2,73-109
+  s_2eadf031bf0ea9::t_0285d2aeadd241 110
+src/app/api/scan/route.ts
+  s_2eadf031bf0ea9::t_706ad81c9f2aca 4
+  s_2eadf031bf0ea9::t_ba050c7f7acce1 16-22,24-28
+  s_2eadf031bf0ea9::t_eb8248ce48769a 98,102-105
+src/app/flow-diagram.tsx
+  s_2eadf031bf0ea9::t_706ad81c9f2aca 237
+src/app/upload-form.tsx
+  s_2eadf031bf0ea9::t_706ad81c9f2aca 56
+README.md
+  s_2eadf031bf0ea9::t_706ad81c9f2aca 87
+  s_2eadf031bf0ea9::t_9217e11cca831e 90-100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "a22f3ec6cdf11789ded8285d5185790fb8295119",
+  "prompts": {},
+  "sessions": {
+    "s_2eadf031bf0ea9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44fa907e-e5fc-4da8-a477-8d4370b97490",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Mherzog4 <matthewherzog4@gmail.com>"
+    }
+  }
+}
