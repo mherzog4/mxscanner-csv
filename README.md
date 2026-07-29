@@ -43,13 +43,17 @@ Set these environment variables:
 ```bash
 RESEND_API_KEY=re_...
 EMAIL_FROM="MX SEG Scanner <reports@gtmreports.com>"
-EMAIL_REPLY_TO="matt@gtmreports.com"
 NEXT_PUBLIC_GITHUB_URL="https://github.com/your-org/mxscanner-csv"
 ```
 
-`EMAIL_FROM` and `EMAIL_REPLY_TO` default to the `gtmreports.com` values above.
-If you fork this, verify your own domain in Resend and override both — Resend
-rejects a `from` address on a domain you have not verified.
+`EMAIL_FROM` defaults to the `gtmreports.com` sender above. If you fork this,
+verify your own domain in Resend and override it — Resend rejects a `from`
+address on a domain you have not verified.
+
+`EMAIL_REPLY_TO` is optional and unset by default, because `gtmreports.com` is
+send-only. A reply-to pointing at a mailbox that bounces is worse than none, so
+the report footer directs readers to social links instead. Set it only if you
+have a mailbox that accepts mail.
 
 ## Usage
 

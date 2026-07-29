@@ -2,10 +2,15 @@ import { randomUUID } from "node:crypto";
 import { Resend } from "resend";
 import type { EnrichmentSummary } from "./types";
 
-// gtmreports.com is the verified sending domain in Resend. Replies route to a
-// real inbox on purpose — the reply is the conversion path for this lead magnet.
+// gtmreports.com is the verified sending domain in Resend, but it is send-only —
+// nothing receives mail there. So no reply-to by default: advertising an address
+// that bounces is worse than not offering one. Set EMAIL_REPLY_TO only if you
+// have a mailbox that actually accepts mail.
 const FROM = process.env.EMAIL_FROM || "MX SEG Scanner <reports@gtmreports.com>";
-const REPLY_TO = process.env.EMAIL_REPLY_TO || "matt@gtmreports.com";
+const REPLY_TO = process.env.EMAIL_REPLY_TO;
+
+const LINKEDIN_URL = "https://www.linkedin.com/in/mtmherzog";
+const X_URL = "https://x.com/mattherzogx";
 
 export async function sendReportEmail({
   to,
@@ -48,14 +53,18 @@ export async function sendReportEmail({
         <li>${mtaStsFound} publish MTA-STS · ${bimiFound} publish BIMI</li>
       </ul>
       <p>The enriched CSV is attached. Provider detection is confidence-scored from public DNS evidence and should be treated as enrichment, not a contractual source of truth.</p>
-      <p style="color:#6b7280; font-size: 13px;">Questions or a provider we misread? Just reply to this email — it goes straight to ${escapeHtml(REPLY_TO)}.</p>
+      <p style="color:#6b7280; font-size: 13px;">
+        Questions, or a provider we misread? This address doesn't take replies —
+        reach me on <a href="${LINKEDIN_URL}" style="color:#1f6f4a;">LinkedIn</a>
+        or <a href="${X_URL}" style="color:#1f6f4a;">X</a>.
+      </p>
     </div>
   `;
 
   const { data, error } = await resend.emails.send({
     from: FROM,
     to: [to],
-    replyTo: REPLY_TO,
+    ...(REPLY_TO ? { replyTo: REPLY_TO } : {}),
     subject: "Your prospect email security gateway report is ready",
     html,
     headers: { "X-Entity-Ref-ID": randomUUID() },
