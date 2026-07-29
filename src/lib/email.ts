@@ -53,7 +53,7 @@ export async function sendReportEmail({
         <li>${dkimFound} of ${domains} domains publish DKIM on a common selector</li>
         <li>${mtaStsFound} publish MTA-STS · ${bimiFound} publish BIMI</li>
       </ul>
-      <p>The enriched CSV is attached. Provider detection is confidence-scored from public DNS evidence and should be treated as enrichment, not a contractual source of truth.</p>
+      <p>The enriched CSV is attached. Provider detection is confidence-scored from public DNS evidence.</p>
       <p style="color:#6b7280; font-size: 13px;">
         Questions, or a provider we misread? This address doesn't take replies —
         reach me on <a href="${LINKEDIN_URL}" style="color:#1f6f4a;">LinkedIn</a>
