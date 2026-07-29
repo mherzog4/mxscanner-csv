@@ -29,11 +29,6 @@ export async function sendReportEmail({
   }
 
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const providerRows = Object.entries(summary.providerCounts)
-    .sort(([, a], [, b]) => b - a)
-    .map(([provider, count]) => `<tr><td>${escapeHtml(provider)}</td><td>${count}</td></tr>`)
-    .join("");
-
   const { dmarcEnforced, spfMissing, dkimFound, mtaStsFound, bimiFound } = summary.deliverability;
   const domains = summary.totalUniqueDomains;
 
@@ -41,11 +36,10 @@ export async function sendReportEmail({
     <div style="font-family: Arial, sans-serif; color: #111827; line-height: 1.5;">
       <h1>Your SEG-enriched CSV is ready</h1>
       <p>We scanned ${domains} unique domains from ${summary.totalValidEmails} valid emails across ${summary.totalRows} rows.</p>
-      <h2>Provider breakdown</h2>
-      <table cellpadding="8" cellspacing="0" style="border-collapse: collapse; border: 1px solid #e5e7eb;">
-        <thead><tr><th align="left">Provider</th><th align="left">Rows</th></tr></thead>
-        <tbody>${providerRows}</tbody>
-      </table>
+      <h2>Security gateway breakdown</h2>
+      ${countTable("Gateway", summary.providerCounts)}
+      <h2>Mailbox provider breakdown</h2>
+      ${countTable("Mailbox", summary.mailboxCounts)}
       <h2>Deliverability posture</h2>
       <ul>
         <li>${dmarcEnforced} of ${domains} domains enforce DMARC (p=quarantine or p=reject)</li>
@@ -91,6 +85,20 @@ export async function addContact(email: string) {
   if (error) {
     console.error("Failed to add contact to Resend audience:", error.message);
   }
+}
+
+// Counts are row-level, so "Unknown" is a real bucket worth showing rather than
+// hiding — it is how you see how much of a list the scan could not place.
+function countTable(label: string, counts: Record<string, number>) {
+  const rows = Object.entries(counts)
+    .sort(([nameA, a], [nameB, b]) => b - a || nameA.localeCompare(nameB))
+    .map(([name, count]) => `<tr><td>${escapeHtml(name)}</td><td>${count}</td></tr>`)
+    .join("");
+
+  return `<table cellpadding="8" cellspacing="0" style="border-collapse: collapse; border: 1px solid #e5e7eb;">
+        <thead><tr><th align="left">${escapeHtml(label)}</th><th align="left">Rows</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
 }
 
 function escapeHtml(value: string) {

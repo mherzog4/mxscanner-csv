@@ -49,6 +49,61 @@ export const providerRules: ProviderRule[] = [
     spfIncludePatterns: ["_spf.google.com"],
     confidence: "high",
   },
+  // Consumer mailboxes. These do NOT match the business rules above: gmail.com
+  // routes to gmail-smtp-in (not aspmx), and outlook.com/hotmail.com route to
+  // olc.protection.outlook.com (not mail.protection.outlook.com). Worth naming
+  // separately — a free mailbox in a prospect list means something different
+  // from a company on Workspace or 365.
+  {
+    id: "gmail-consumer",
+    name: "Gmail (consumer)",
+    categories: ["mailbox"],
+    mxPatterns: ["gmail-smtp-in.l.google.com"],
+    confidence: "high",
+  },
+  {
+    id: "outlook-consumer",
+    name: "Outlook.com / Hotmail",
+    categories: ["mailbox"],
+    mxPatterns: ["olc.protection.outlook.com"],
+    confidence: "high",
+  },
+  {
+    id: "yahoo",
+    name: "Yahoo / AOL Mail",
+    categories: ["mailbox"],
+    mxPatterns: ["yahoodns.net"],
+    confidence: "high",
+  },
+  {
+    id: "icloud",
+    name: "iCloud Mail",
+    categories: ["mailbox"],
+    mxPatterns: ["mail.icloud.com"],
+    confidence: "high",
+  },
+  {
+    id: "proton",
+    name: "Proton Mail",
+    categories: ["mailbox"],
+    mxPatterns: ["protonmail.ch"],
+    confidence: "high",
+  },
+  {
+    id: "zoho",
+    name: "Zoho Mail",
+    categories: ["mailbox", "outbound_sender"],
+    mxPatterns: ["smtpin.zoho.com", "zoho.eu"],
+    spfIncludePatterns: ["zoho.com", "zoho.eu"],
+    confidence: "high",
+  },
+  {
+    id: "gmx",
+    name: "GMX / Mail.com",
+    categories: ["mailbox"],
+    mxPatterns: ["gmx.net"],
+    confidence: "high",
+  },
   {
     id: "cisco-secure-email",
     name: "Cisco Secure Email / IronPort",

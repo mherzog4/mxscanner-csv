@@ -63,13 +63,14 @@ const STEPS = {
     code: "GET dns.google/resolve?name=acme.com&type=MX\nGET dns.google/resolve?name=acme.com&type=TXT\nGET dns.google/resolve?name=_dmarc.acme.com&type=TXT\nGET dns.google/resolve?name=_mta-sts.acme.com&type=TXT\nGET dns.google/resolve?name=selector1._domainkey.acme.com&type=TXT",
   },
   rules: {
-    title: "Match 17 provider rules",
+    title: "Match 24 provider rules",
     meta: "provider-rules.ts · pattern table, no AI",
     body: (
       <>
         Each provider is a set of fingerprints: MX hostnames, TXT strings, SPF includes. A hit classifies the domain as
         SEG, mailbox provider, and/or outbound sender — with a confidence level and the exact DNS record kept as
-        evidence.
+        evidence. Consumer inboxes get their own rules, so Gmail and Outlook.com rows are counted separately from
+        Workspace and 365 tenants.
       </>
     ),
     code: "mimecast:\n  mx:  mimecast.com\n  spf: _netblocks.mimecast.com\n  confidence: high",
@@ -244,7 +245,7 @@ export function FlowDiagram() {
 
             <FlowNode k="rules" {...nodeProps}>
               <rect x="210" y="428" width="200" height="48" />
-              <text x="310" y="448" textAnchor="middle">Match 17 provider rules</text>
+              <text x="310" y="448" textAnchor="middle">Match 24 provider rules</text>
               <text className="sub" x="310" y="464" textAnchor="middle">SEG · mailbox · outbound senders</text>
             </FlowNode>
 

@@ -65,6 +65,39 @@ describe("csv enrichment", () => {
     });
   });
 
+  it("counts mailbox providers per row, with unplaced rows under Unknown", async () => {
+    const gmail: DomainScanResult = {
+      ...proofpointResult,
+      domain: "gmail.com",
+      classification: {
+        ...proofpointResult.classification,
+        securityGateway: null,
+        mailboxProvider: {
+          providerId: "gmail-consumer",
+          providerName: "Gmail (consumer)",
+          category: "mailbox",
+          confidence: "high",
+          evidence: [{ recordType: "MX", record: "10 alt1.gmail-smtp-in.l.google.com.", reason: "matched gmail-smtp-in" }],
+        },
+      },
+    };
+    const parsed = await parseCsv(
+      "email\na@gmail.com\nb@gmail.com\nc@example.com\nnot-an-email\n",
+    );
+    const output = await buildEnrichedCsv(
+      parsed,
+      new Map([
+        ["gmail.com", gmail],
+        ["example.com", proofpointResult],
+      ]),
+    );
+
+    // Two Gmail rows; the Proofpoint domain has no mailbox match and the invalid
+    // row has no scan at all, so both land in Unknown.
+    expect(output.summary.mailboxCounts).toEqual({ "Gmail (consumer)": 2, Unknown: 2 });
+    expect(output.summary.providerCounts).toEqual({ Proofpoint: 1, Unknown: 3 });
+  });
+
   it("neutralizes formula-injection cells in output", async () => {
     const hostile: DomainScanResult = {
       ...proofpointResult,

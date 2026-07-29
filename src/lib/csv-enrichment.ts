@@ -80,6 +80,7 @@ export async function buildEnrichedCsv(parsed: ParsedCsv, scanResults: Map<strin
   ];
   const outputRows: Record<string, string>[] = [];
   const providerCounts: Record<string, number> = {};
+  const mailboxCounts: Record<string, number> = {};
   let validEmails = 0;
 
   for (const row of parsed.rows) {
@@ -93,6 +94,11 @@ export async function buildEnrichedCsv(parsed: ParsedCsv, scanResults: Map<strin
     const firstSegEvidence = seg?.evidence[0];
     const providerName = seg?.providerName ?? "Unknown";
     providerCounts[providerName] = (providerCounts[providerName] ?? 0) + 1;
+
+    // Row-level, same as providerCounts: "how many of my prospects are on Gmail"
+    // is a per-person question, not a per-domain one.
+    const mailboxName = result?.classification.mailboxProvider?.providerName ?? "Unknown";
+    mailboxCounts[mailboxName] = (mailboxCounts[mailboxName] ?? 0) + 1;
 
     outputRows.push({
       ...row,
@@ -133,6 +139,7 @@ export async function buildEnrichedCsv(parsed: ParsedCsv, scanResults: Map<strin
       totalValidEmails: validEmails,
       totalUniqueDomains: scanResults.size,
       providerCounts,
+      mailboxCounts,
       unknownDomains: scanned.filter((result) => !result.classification.securityGateway).length,
       deliverability: {
         // Domain-level, not row-level: these count unique domains scanned.

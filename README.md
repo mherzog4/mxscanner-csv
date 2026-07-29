@@ -20,6 +20,10 @@ Upload a CSV of email addresses, scan each unique domain through Google Public D
 
 Initial provider mappings include Proofpoint, Proofpoint Essentials, Mimecast, Barracuda, Microsoft 365 / EOP, Google Workspace, Cisco Secure Email / IronPort, Sophos, Fortinet, Trend Micro, Cloudflare Area 1, Zix / AppRiver, SendGrid, Mailgun, Mailchimp, HubSpot, and Salesforce.
 
+Consumer mailboxes have separate rules — Gmail, Outlook.com / Hotmail, Yahoo / AOL, iCloud, Proton, Zoho, and GMX. They need them: `gmail.com` routes to `gmail-smtp-in.l.google.com` rather than `aspmx`, and `outlook.com` routes to `olc.protection.outlook.com` rather than `mail.protection.outlook.com`, so the business-tenant patterns do not match them. Keeping them distinct is the difference between "this prospect is on a company mail system" and "this is a personal address".
+
+MX evidence assigns every role a rule claims except outbound sender, so a Microsoft 365 tenant counts as both the inbound gateway (EOP) and the mailbox. SPF evidence only ever assigns outbound sender — an include authorizes sending and must not promote a provider to gateway or mailbox on its own.
+
 ## Stack
 
 - Next.js App Router
