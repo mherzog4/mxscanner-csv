@@ -1,35 +1,76 @@
 import { detectProviders } from "./detect-providers";
 import type { DomainScanResult, PolicyStatus } from "./types";
 
-type GoogleDnsAnswer = {
+type DnsAnswer = {
   name: string;
   type: number;
   TTL?: number;
   data: string;
 };
 
-type GoogleDnsResponse = {
+type DnsResponse = {
   Status: number;
   AD?: boolean;
-  Answer?: GoogleDnsAnswer[];
+  Answer?: DnsAnswer[];
   Comment?: string;
 };
 
-const DNS_ENDPOINT = "https://dns.google/resolve";
+type DnsResolver = {
+  id: string;
+  url: string;
+  headers: Record<string, string>;
+};
 
-async function queryDns(domain: string, type: "MX" | "TXT" | "A" | "AAAA", signal: AbortSignal): Promise<GoogleDnsResponse> {
-  const params = new URLSearchParams({
-    name: domain,
-    type,
-    edns_client_subnet: "0.0.0.0/0",
+// Two DoH resolvers, not one. Each domain is pinned to a resolver by position,
+// which halves the query volume any single provider sees — the fair-use headroom
+// is what caps how many domains a scan can cover.
+//
+// Both speak the same RFC 8484 JSON shape (verified: identical Status/Answer
+// fields for the same query), so nothing downstream cares which answered.
+//
+// Node's own resolver is deliberately not used here: in serverless it goes
+// through the platform resolver, which rate-limits hard (~1k packets/sec per
+// interface) and returns EREFUSED under the concurrency this scan needs. DoH
+// measured an order of magnitude faster and did not throttle.
+const RESOLVERS: DnsResolver[] = [
+  { id: "google", url: "https://dns.google/resolve", headers: {} },
+  { id: "cloudflare", url: "https://cloudflare-dns.com/dns-query", headers: { accept: "application/dns-json" } },
+];
+
+type RecordType = "MX" | "TXT" | "A" | "AAAA";
+
+async function queryOne(resolver: DnsResolver, name: string, type: RecordType, signal: AbortSignal): Promise<DnsResponse> {
+  const params = new URLSearchParams({ name, type, edns_client_subnet: "0.0.0.0/0" });
+  const response = await fetch(`${resolver.url}?${params}`, {
+    headers: resolver.headers,
+    signal,
+    cache: "no-store",
   });
-  const response = await fetch(`${DNS_ENDPOINT}?${params}`, { signal, cache: "no-store" });
 
   if (!response.ok) {
-    throw new Error(`Google DNS ${type} query failed with ${response.status}`);
+    throw new Error(`${resolver.id} DNS ${type} query for ${name} failed with ${response.status}`);
   }
 
-  return (await response.json()) as GoogleDnsResponse;
+  return (await response.json()) as DnsResponse;
+}
+
+// Try the pinned resolver, then the other one. A provider hiccup or a throttle
+// response costs one retry instead of failing the whole domain.
+async function queryDns(startIndex: number, name: string, type: RecordType, signal: AbortSignal): Promise<DnsResponse> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < RESOLVERS.length; attempt++) {
+    // The shared 10s budget is already blown; retrying elsewhere cannot help.
+    if (signal.aborted) break;
+
+    try {
+      return await queryOne(RESOLVERS[(startIndex + attempt) % RESOLVERS.length]!, name, type, signal);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(`DNS ${type} query for ${name} failed`);
 }
 
 function normalizeTxtRecord(value: string) {
@@ -40,11 +81,11 @@ function normalizeTxtRecord(value: string) {
 // policy records below that is the common case, not a lookup failure.
 const NXDOMAIN = 3;
 
-function isResolved(response: GoogleDnsResponse) {
+function isResolved(response: DnsResponse) {
   return response.Status === 0 || response.Status === NXDOMAIN;
 }
 
-function txtAnswers(response: GoogleDnsResponse) {
+function txtAnswers(response: DnsResponse) {
   return isResolved(response) ? (response.Answer ?? []).map((answer) => normalizeTxtRecord(answer.data)) : [];
 }
 
@@ -70,7 +111,7 @@ export function getPrimaryMxHost(records: string[]) {
   return parsed.sort((a, b) => a.priority - b.priority)[0]?.host;
 }
 
-function policyStatus(response: GoogleDnsResponse, record: string | undefined): PolicyStatus {
+function policyStatus(response: DnsResponse, record: string | undefined): PolicyStatus {
   if (!isResolved(response)) return "error";
   return record ? "present" : "missing";
 }
@@ -85,20 +126,23 @@ function isDkimRecord(record: string) {
   return value.startsWith("v=dkim1") || (value.includes("p=") && value.includes("k="));
 }
 
-export async function scanDomain(domain: string): Promise<DomainScanResult> {
+// resolverIndex pins this domain's queries to one resolver so load spreads
+// evenly across providers instead of every domain hammering the same one.
+export async function scanDomain(domain: string, resolverIndex = 0): Promise<DomainScanResult> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
+  const q = (name: string, type: RecordType) => queryDns(resolverIndex, name, type, controller.signal);
 
   try {
     const [mxResponse, txtResponse, dmarcResponse, mtaStsResponse, tlsRptResponse, bimiResponse, ...dkimResponses] =
       await Promise.all([
-        queryDns(domain, "MX", controller.signal),
-        queryDns(domain, "TXT", controller.signal),
-        queryDns(`_dmarc.${domain}`, "TXT", controller.signal),
-        queryDns(`_mta-sts.${domain}`, "TXT", controller.signal),
-        queryDns(`_smtp._tls.${domain}`, "TXT", controller.signal),
-        queryDns(`default._bimi.${domain}`, "TXT", controller.signal),
-        ...DKIM_SELECTORS.map((selector) => queryDns(`${selector}._domainkey.${domain}`, "TXT", controller.signal)),
+        q(domain, "MX"),
+        q(domain, "TXT"),
+        q(`_dmarc.${domain}`, "TXT"),
+        q(`_mta-sts.${domain}`, "TXT"),
+        q(`_smtp._tls.${domain}`, "TXT"),
+        q(`default._bimi.${domain}`, "TXT"),
+        ...DKIM_SELECTORS.map((selector) => q(`${selector}._domainkey.${domain}`, "TXT")),
       ]);
 
     const mxRecords = isResolved(mxResponse) ? (mxResponse.Answer ?? []).map((answer) => answer.data) : [];
@@ -187,9 +231,10 @@ export async function scanDomains(domains: string[], concurrency: number) {
 
   async function worker() {
     while (index < domains.length) {
-      const domain = domains[index++];
+      const position = index++;
+      const domain = domains[position];
       if (!domain) continue;
-      results.set(domain, await scanDomain(domain));
+      results.set(domain, await scanDomain(domain, position % RESOLVERS.length));
     }
   }
 

@@ -1,0 +1,72 @@
+import { afterEach, describe, expect, it } from "vitest";
+import { getPrimaryMxHost, scanDomain, scanDomains } from "./dns";
+
+describe("getPrimaryMxHost", () => {
+  it("picks the lowest-preference host and strips the trailing dot", () => {
+    expect(
+      getPrimaryMxHost(["20 mxb-001.pphosted.com.", "10 mxa-001.pphosted.com.", "30 backup.example.net."]),
+    ).toBe("mxa-001.pphosted.com");
+  });
+
+  it("sorts numerically, not lexically", () => {
+    expect(getPrimaryMxHost(["100 high.example.com.", "9 low.example.com."])).toBe("low.example.com");
+  });
+
+  it("returns undefined for empty or malformed answers", () => {
+    expect(getPrimaryMxHost([])).toBeUndefined();
+    expect(getPrimaryMxHost(["not an mx record"])).toBeUndefined();
+  });
+});
+
+describe("resolver round-robin and failover", () => {
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  function okResponse(answer: string) {
+    return new Response(JSON.stringify({ Status: 0, Answer: [{ name: "x", type: 15, data: answer }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  it("spreads domains across both resolvers", async () => {
+    const hosts: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      hosts.push(new URL(String(input)).host);
+      return okResponse("10 mx.example.com.");
+    }) as typeof fetch;
+
+    await scanDomains(["a.com", "b.com"], 1);
+
+    expect(new Set(hosts)).toEqual(new Set(["dns.google", "cloudflare-dns.com"]));
+  });
+
+  it("falls over to the second resolver when the first errors", async () => {
+    const hosts: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const host = new URL(String(input)).host;
+      hosts.push(host);
+      if (host === "dns.google") return new Response("rate limited", { status: 429 });
+      return okResponse("10 mxa-001.pphosted.com.");
+    }) as typeof fetch;
+
+    // Domain at position 0 is pinned to Google, which is failing here.
+    const result = await scanDomain("a.com", 0);
+
+    expect(hosts).toContain("cloudflare-dns.com");
+    expect(result.error).toBeUndefined();
+    expect(result.mx.primaryHost).toBe("mxa-001.pphosted.com");
+    expect(result.classification.securityGateway?.providerName).toBe("Proofpoint");
+  });
+
+  it("reports an error when every resolver fails", async () => {
+    globalThis.fetch = (async () => new Response("boom", { status: 500 })) as typeof fetch;
+
+    const result = await scanDomain("a.com", 0);
+
+    expect(result.error).toBeTruthy();
+    expect(result.mx.status).toBe("error");
+  });
+});
