@@ -136,6 +136,37 @@ The cache key carries a version (`mxscan:v1:{domain}`). Bump `CACHE_VERSION` in
 `src/lib/domain-cache.ts` whenever `DomainScanResult` gains a field, or old entries
 will keep serving rows missing the new columns.
 
+## Architecture
+
+Scanning runs as a durable background job, not inside the HTTP request.
+
+```
+POST /api/scan          validate -> upload CSV to Blob -> start workflow -> 202 { runId }
+scanWorkflow            parse -> scanChunk x N -> finalize
+GET  /api/scan/status    run state for the form to poll
+```
+
+The synchronous version could not be made to scale, and not because of tuning. Total
+work was bounded by one request's `maxDuration`, so a large scan was killed mid-flight
+and delivered nothing — measured, with a 5,000-domain upload. Chunking inside that
+request does not help either: the ceiling is the request, not the loop.
+
+Now each chunk of 800 domains is a `"use step"` function with its own invocation and its
+own duration budget, so total job size is unbounded by any single function limit. Steps
+are individually retryable and their results are persisted, so a failure resumes instead
+of restarting.
+
+Two details worth keeping:
+
+- **Chunks run sequentially, on purpose.** The bottleneck is resolver fair-use on a
+  shared egress range, so parallel chunks would reach the throttle sooner rather than
+  finish faster — the same reason more functions never helped the synchronous path.
+- **Chunk results go to Blob, not into workflow state.** Only a pathname crosses the
+  step boundary, so workflow state stays small no matter how many domains a job covers.
+
+Uploads and intermediate chunk files are deleted in the finalize step. That deletion is
+what makes the privacy claim below true, so it is best-effort but always attempted.
+
 ## Abuse Limits
 
 Two layers, because they catch different things.
