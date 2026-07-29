@@ -101,12 +101,11 @@ footer a {
 }
 
 .hero {
-  min-height: calc(100dvh - 120px);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.68fr);
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.62fr);
   align-items: center;
-  gap: 52px;
-  padding: 46px 0 54px;
+  gap: 48px;
+  padding: 46px 0 34px;
 }
 
 .hero-copy {
@@ -164,7 +163,6 @@ h1 {
 }
 
 .upload-card,
-.video-card,
 .sample-output,
 .checks {
   border: 1px solid var(--line);
@@ -174,8 +172,9 @@ h1 {
 }
 
 .upload-card {
+  width: 100%;
   max-width: 520px;
-  margin-top: 26px;
+  margin-left: auto;
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -267,49 +266,23 @@ input:disabled {
   color: var(--ink);
 }
 
-.video-card {
-  width: min(100%, 440px);
-  aspect-ratio: 1;
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  padding: 24px;
-  background: var(--panel-strong);
-}
-
-.play-dot {
-  position: relative;
-  flex: 0 0 auto;
-  width: 58px;
-  height: 58px;
-  border-radius: 999px;
-  background: var(--accent);
-}
-
-.play-dot::after {
-  content: "";
-  position: absolute;
-  left: 23px;
-  top: 18px;
-  width: 0;
-  height: 0;
-  border-top: 11px solid transparent;
-  border-bottom: 11px solid transparent;
-  border-left: 15px solid var(--accent-ink);
-}
-
-.video-card p {
-  margin: 0 0 6px;
-  font-size: 20px;
-  font-weight: 850;
-}
-
-.video-card span,
 footer span {
   color: var(--muted);
   line-height: 1.45;
+}
+
+.flow-section {
+  padding: 34px 0 10px;
+  border-top: 1px solid var(--line);
+}
+
+.flow-section h2 {
+  margin-top: 4px;
+}
+
+.flow-section .lede {
+  margin: 16px 0 30px;
+  font-size: clamp(17px, 1.7vw, 20px);
 }
 
 h2 {
@@ -585,15 +558,12 @@ svg.flow {
 @media (max-width: 900px) {
   .hero {
     grid-template-columns: 1fr;
+    gap: 28px;
+    padding: 38px 0 24px;
   }
 
-  .hero {
-    min-height: auto;
-    padding: 38px 0 20px;
-  }
-
-  .video-card {
-    margin: 8px 0 0;
+  .upload-card {
+    margin-left: 0;
   }
 }
 
@@ -615,19 +585,12 @@ svg.flow {
   }
 
   .upload-card,
-  .video-card,
   .checks {
     padding: 18px;
   }
 
   button {
     white-space: normal;
-  }
-
-  .video-card {
-    align-items: flex-start;
-    flex-direction: column;
-    justify-content: center;
   }
 
   footer {

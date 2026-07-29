@@ -1,3 +1,4 @@
+import { FlowDiagram } from "./how-it-works/flow-diagram";
 import { UploadForm } from "./upload-form";
 
 export default function Home() {
@@ -11,7 +12,7 @@ export default function Home() {
           <span>SEG Scanner</span>
         </a>
         <span className="nav-links">
-          <a className="nav-link" href="/how-it-works">How it works</a>
+          <a className="nav-link" href="#how-it-works">How it works</a>
           <a className="nav-link" href={githubUrl}>GitHub</a>
         </span>
       </nav>
@@ -28,16 +29,19 @@ export default function Home() {
             <span>Microsoft 365</span>
             <span>Google Workspace</span>
           </div>
-          <UploadForm />
         </div>
 
-        <div className="video-card" aria-label="Product demo placeholder">
-          <div className="play-dot" />
-          <div>
-            <p>VSL demo placeholder</p>
-            <span>Explain how the CSV comes back enriched, with confidence and DNS evidence.</span>
-          </div>
-        </div>
+        <UploadForm />
+      </section>
+
+      <section className="flow-section" id="how-it-works">
+        <div className="eyebrow">How it works</div>
+        <h2>One CSV upload replaces 5,000 DNS lookups</h2>
+        <p className="lede">
+          Every unique domain gets checked against public DNS to find out which inboxes sit behind a secure email
+          gateway. Click any step to see what actually runs.
+        </p>
+        <FlowDiagram />
       </section>
 
       <footer>
