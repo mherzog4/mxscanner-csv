@@ -44,3 +44,24 @@ describe("domain cache", () => {
     await expect(cacheDomains(new Map())).resolves.toBeUndefined();
   });
 });
+
+describe("cache keying by scan mode", () => {
+  // A fast-mode result records dkim.status = "not_checked". If the key ignored the
+  // mode, a later DKIM run would get that back as a hit and report no DKIM data for a
+  // check the user explicitly asked for.
+  it("does not serve a non-DKIM entry to a DKIM scan", async () => {
+    const domain = `mode-example-${process.hrtime.bigint()}.com`;
+    await cacheDomains(new Map([[domain, { ...base, domain, dkim: { status: "not_checked", selectors: [] } }]]), false);
+
+    expect((await getCachedDomains([domain], false)).get(domain)?.dkim.status).toBe("not_checked");
+    expect(await getCachedDomains([domain], true)).toEqual(new Map());
+  });
+
+  it("keeps DKIM results on their own key", async () => {
+    const domain = `mode-dkim-${process.hrtime.bigint()}.com`;
+    await cacheDomains(new Map([[domain, { ...base, domain, dkim: { status: "present", selectors: ["google"] } }]]), true);
+
+    expect((await getCachedDomains([domain], true)).get(domain)?.dkim.selectors).toEqual(["google"]);
+    expect(await getCachedDomains([domain], false)).toEqual(new Map());
+  });
+});

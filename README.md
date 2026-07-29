@@ -84,7 +84,7 @@ If none of those headers exist, the scanner attempts to detect email-like values
 
 - Max file size: 25 MB
 - Max rows: 25,000
-- Max unique domains: 1,500
+- Max unique domains: 3,500 (1,500 with DKIM probing)
 - DNS concurrency: 60
 
 The domain cap is set from **production** measurement, and the first number was
@@ -194,7 +194,7 @@ dkim_selectors
 
 ## DNS Queries Per Domain
 
-Each unique domain gets 14 DNS-over-HTTPS queries, all issued in parallel:
+Six queries by default, or 14 with DKIM probing enabled, all issued in parallel:
 
 ```text
 MX                            inbound routing + SEG detection
@@ -209,6 +209,17 @@ default._bimi.{domain}        BIMI record
 DKIM selectors cannot be enumerated from DNS — they can only be guessed — so the
 probe list in `src/lib/dns.ts` covers common mailbox and ESP defaults.
 A missing selector means "not found on a common name", not "no DKIM".
+
+That guessing is why DKIM is **opt-in**. Eight of the fourteen queries per domain exist
+to probe it — 57% of all DNS traffic for the least conclusive column in the report — and
+DNS throughput is what caps how many domains a run can cover. Leaving it off roughly
+doubles the domains a single scan can reach, so `dkim_status` reads `not_checked` unless
+the box is ticked. That value is deliberately distinct from `missing`: one means nothing
+matched, the other means nothing was asked.
+
+Cache keys include the mode (`mxscan:v1:base:` vs `mxscan:v1:dkim:`). Without that, a
+fast-mode entry would satisfy a later DKIM run and silently report no DKIM data for a
+check the user explicitly requested.
 
 ## Provider Rules
 

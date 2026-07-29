@@ -126,12 +126,21 @@ function isDkimRecord(record: string) {
   return value.startsWith("v=dkim1") || (value.includes("p=") && value.includes("k="));
 }
 
-// resolverIndex pins this domain's queries to one resolver so load spreads
-// evenly across providers instead of every domain hammering the same one.
-export async function scanDomain(domain: string, resolverIndex = 0): Promise<DomainScanResult> {
+// Queries issued per domain, by mode. DKIM probing is 8 of the 14 — 57% of all DNS
+// traffic for the weakest signal in the report, since a miss only ever means "not on
+// a selector we guessed". Turning it off is the cheapest way to raise how many domains
+// a single run can cover, so it is opt-in rather than always-on.
+export const QUERIES_PER_DOMAIN_BASE = 6;
+export const QUERIES_PER_DOMAIN_WITH_DKIM = QUERIES_PER_DOMAIN_BASE + 8;
+
+export type ScanOptions = { resolverIndex?: number; includeDkim?: boolean };
+
+export async function scanDomain(domain: string, options: ScanOptions = {}): Promise<DomainScanResult> {
+  const { resolverIndex = 0, includeDkim = false } = options;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   const q = (name: string, type: RecordType) => queryDns(resolverIndex, name, type, controller.signal);
+  const selectors = includeDkim ? DKIM_SELECTORS : [];
 
   try {
     const [mxResponse, txtResponse, dmarcResponse, mtaStsResponse, tlsRptResponse, bimiResponse, ...dkimResponses] =
@@ -142,7 +151,7 @@ export async function scanDomain(domain: string, resolverIndex = 0): Promise<Dom
         q(`_mta-sts.${domain}`, "TXT"),
         q(`_smtp._tls.${domain}`, "TXT"),
         q(`default._bimi.${domain}`, "TXT"),
-        ...DKIM_SELECTORS.map((selector) => q(`${selector}._domainkey.${domain}`, "TXT")),
+        ...selectors.map((selector) => q(`${selector}._domainkey.${domain}`, "TXT")),
       ]);
 
     const mxRecords = isResolved(mxResponse) ? (mxResponse.Answer ?? []).map((answer) => answer.data) : [];
@@ -152,8 +161,16 @@ export async function scanDomain(domain: string, resolverIndex = 0): Promise<Dom
     const mtaStsRecord = txtAnswers(mtaStsResponse).find((record) => record.toLowerCase().startsWith("v=stsv1"));
     const tlsRptRecord = txtAnswers(tlsRptResponse).find((record) => record.toLowerCase().startsWith("v=tlsrptv1"));
     const bimiRecord = txtAnswers(bimiResponse).find((record) => record.toLowerCase().startsWith("v=bimi1"));
-    const dkimSelectors = DKIM_SELECTORS.filter((_, index) => txtAnswers(dkimResponses[index]!).some(isDkimRecord));
-    const dkimErrored = dkimResponses.every((response) => !isResolved(response));
+    const dkimSelectors = selectors.filter((_, index) => txtAnswers(dkimResponses[index]!).some(isDkimRecord));
+    // "not_checked" is distinct from "missing": one means we looked and found nothing,
+    // the other means we never asked. Conflating them would misreport the whole column.
+    const dkimStatus: PolicyStatus | "not_checked" = !includeDkim
+      ? "not_checked"
+      : dkimResponses.every((response) => !isResolved(response))
+        ? "error"
+        : dkimSelectors.length > 0
+          ? "present"
+          : "missing";
     const classification = detectProviders(mxRecords, txtRecords);
     const notes: string[] = [];
 
@@ -192,10 +209,7 @@ export async function scanDomain(domain: string, resolverIndex = 0): Promise<Dom
       },
       tlsRpt: { status: policyStatus(tlsRptResponse, tlsRptRecord), record: tlsRptRecord },
       bimi: { status: policyStatus(bimiResponse, bimiRecord), record: bimiRecord },
-      dkim: {
-        status: dkimErrored ? "error" : dkimSelectors.length > 0 ? "present" : "missing",
-        selectors: dkimSelectors,
-      },
+      dkim: { status: dkimStatus, selectors: dkimSelectors },
       classification,
       dnssec: { ad: Boolean(mxResponse.AD || txtResponse.AD || dmarcResponse.AD) },
       notes,
@@ -252,7 +266,12 @@ function skippedResult(domain: string): DomainScanResult {
 //
 // Domains past the deadline come back marked, so every row still gets a value and the
 // report says plainly which ones were not reached.
-export async function scanDomains(domains: string[], concurrency: number, budgetMs = Number.POSITIVE_INFINITY) {
+export async function scanDomains(
+  domains: string[],
+  concurrency: number,
+  budgetMs = Number.POSITIVE_INFINITY,
+  includeDkim = false,
+) {
   const results = new Map<string, DomainScanResult>();
   const deadline = Date.now() + budgetMs;
   let index = 0;
@@ -265,7 +284,9 @@ export async function scanDomains(domains: string[], concurrency: number, budget
 
       results.set(
         domain,
-        Date.now() >= deadline ? skippedResult(domain) : await scanDomain(domain, position % RESOLVERS.length),
+        Date.now() >= deadline
+          ? skippedResult(domain)
+          : await scanDomain(domain, { resolverIndex: position % RESOLVERS.length, includeDkim }),
       );
     }
   }
