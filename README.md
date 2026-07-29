@@ -84,31 +84,30 @@ If none of those headers exist, the scanner attempts to detect email-like values
 
 - Max file size: 25 MB
 - Max rows: 25,000
-- Max unique domains: 3,500 (1,500 with DKIM probing)
+- Max unique domains: 10,000 (4,000 with DKIM probing)
 - DNS concurrency: 60
 
-The domain cap is set from **production** measurement, and the first number was
-wrong. A local benchmark showed ~320 domains/sec against the DoH resolvers, so the cap
-was initially set to 10,000. A deployed function then failed to finish 5,000 domains
-inside the 300s limit — under ~17/sec effective — and delivered nothing at all. Public
-resolvers throttle datacenter egress far harder than a residential connection, and the
-local run also benefited from warm parent-zone NS caches. Do not trust laptop DNS
-throughput numbers for serverless.
+The domain cap comes from a measured run on a deployment:
 
-The scan also carries a 240s internal budget. Domains not reached before it expires
-come back marked (`mx_scan_error` says the budget was exhausted) so a long run degrades
-into a partial report instead of being killed mid-flight with nothing delivered.
+| Domains | Wall clock | Rate | Notes |
+|---|---|---|---|
+| 5,000 | **failed** | — | old synchronous path, died at the 300s request limit |
+| 3,480 | 53s | 39/sec | workflow, 5 chunks |
+| 10,000 | 168s | 60/sec | workflow, 13 chunks, 13s avg/step vs 120s budget |
 
-The binding constraints are elsewhere:
+Throughput per domain is *higher* at 10,000 than at 3,480 because each chunk is a
+separate invocation, so the progressive resolver throttling that punished one
+long-running request no longer accumulates across a whole job. Chunking bought headroom
+as well as removing the ceiling.
 
-- **Resend caps a message at 40 MB after base64.** The route checks the encoded
-  size before sending and returns a 413 with instructions rather than letting
-  Resend reject a completed scan.
-- **Resolver fair use.** 14 queries per domain means a 10,000-domain scan issues
-  140,000 queries. Splitting across two providers halves what either one sees, and
-  the domain cache below removes repeats entirely.
-- **The wait is synchronous.** A large scan holds the request open with no
-  progress indicator. Past a couple of minutes this wants a background job.
+An earlier version of this file justified a 10,000 cap from a laptop benchmark of
+~320 domains/sec. That number did not transfer and a production job died. The figures
+above are all from deployed runs — do not substitute local DNS throughput for them.
+
+The DKIM cap (4,000) is derived from the query-cost ratio rather than measured directly.
+That is acceptable now in a way it was not before: a chunk that runs long returns its
+remaining domains marked, so an optimistic cap degrades into a partial report rather
+than losing the job.
 
 `maxDuration` is 300s, the Fluid Compute default and the Hobby ceiling. Pro and
 Enterprise can raise it to 800s.
