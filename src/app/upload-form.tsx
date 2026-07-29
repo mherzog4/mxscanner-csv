@@ -108,7 +108,7 @@ export function UploadForm() {
         <input name="includeDkim" type="checkbox" disabled={busy} />
         <span>
           Probe DKIM selectors
-          <em>More than doubles DNS work, so the domain limit drops to 1,500.</em>
+          <em>More than doubles DNS work, so the domain limit drops to 4,000.</em>
         </span>
       </label>
       <button type="submit" disabled={busy}>
@@ -118,7 +118,7 @@ export function UploadForm() {
             ? "Scanning..."
             : "Scan and email enriched CSV"}
       </button>
-      <p className="fine-print">Limits: 25 MB CSV, 25,000 rows, 3,500 unique domains.</p>
+      <p className="fine-print">Limits: 25 MB CSV, 25,000 rows, 10,000 unique domains.</p>
       {state.status === "running" ? <p className="form-status running">{state.message}</p> : null}
       {state.status === "success" ? <p className="form-status success">{state.message}</p> : null}
       {state.status === "error" ? <p className="form-status error">{state.message}</p> : null}

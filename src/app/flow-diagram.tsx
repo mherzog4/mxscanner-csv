@@ -234,7 +234,7 @@ export function FlowDiagram() {
             <FlowNode k="dedupe" {...nodeProps}>
               <rect x="210" y="260" width="200" height="48" />
               <text x="310" y="280" textAnchor="middle">Dedupe to unique domains</text>
-              <text className="sub" x="310" y="296" textAnchor="middle">25,000 rows → ≤3,500 domains</text>
+              <text className="sub" x="310" y="296" textAnchor="middle">25,000 rows → ≤10,000 domains</text>
             </FlowNode>
 
             <FlowNode k="dns" {...nodeProps}>

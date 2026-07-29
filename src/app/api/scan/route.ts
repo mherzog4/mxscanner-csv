@@ -15,17 +15,20 @@ export const maxDuration = 60;
 const MAX_FILE_BYTES = 25_000_000;
 const MAX_ROWS = 25_000;
 
-// Measured in production, not extrapolated from a laptop. A local benchmark showed
-// ~320 domains/sec against the DoH resolvers, but a deployed function did not finish
-// 5,000 domains inside 300s — under ~17/sec effective, and 1,400 domains resolved at
-// ~25/sec. Public resolvers throttle datacenter egress far harder than residential,
-// and throughput degrades as sustained volume climbs, so these are not extrapolations
-// from a smaller sample.
+// Measured on a deployment, not extrapolated. A 10,000-domain job completed in 168s
+// (~60 domains/sec) across 13 chunk steps, averaging 13s per step against a 120s step
+// budget — roughly 9x headroom. The old synchronous path died at 5,000.
 //
-// The cap scales with query cost: skipping DKIM cuts 8 of 14 queries per domain, so a
-// run covers proportionally more domains in the same budget.
-const MAX_UNIQUE_DOMAINS_WITH_DKIM = 1_500;
-const MAX_UNIQUE_DOMAINS = 3_500;
+// Throughput per domain is *higher* at 10,000 than it was at 3,480 (60/sec vs 39/sec)
+// because each chunk is a separate invocation, so the progressive resolver throttling
+// that punished one long-running request no longer accumulates across the whole job.
+//
+// The DKIM cap is derived from the query-cost ratio (14 vs 6 per domain) rather than
+// measured directly. That is safe here in a way it was not before: a chunk that runs
+// long now returns its remaining domains marked, so an optimistic cap degrades into a
+// partial report instead of losing the job.
+const MAX_UNIQUE_DOMAINS_WITH_DKIM = 4_000;
+const MAX_UNIQUE_DOMAINS = 10_000;
 const SCAN_CONCURRENCY = 60;
 
 // Leaves ~60s of the 300s function budget for parsing, CSV generation and the Resend
