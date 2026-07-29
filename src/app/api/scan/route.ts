@@ -16,10 +16,15 @@ const MAX_ROWS = 25_000;
 
 // Measured in production, not extrapolated from a laptop. A local benchmark showed
 // ~320 domains/sec against the DoH resolvers, but a deployed function did not finish
-// 5,000 domains inside 300s — under ~17/sec effective. Public resolvers throttle
-// datacenter egress far harder than residential, and the local run also benefited
-// from warm parent-zone NS caches. 1,500 sits well under the observed failure point.
-const MAX_UNIQUE_DOMAINS = 1_500;
+// 5,000 domains inside 300s — under ~17/sec effective, and 1,400 domains resolved at
+// ~25/sec. Public resolvers throttle datacenter egress far harder than residential,
+// and throughput degrades as sustained volume climbs, so these are not extrapolations
+// from a smaller sample.
+//
+// The cap scales with query cost: skipping DKIM cuts 8 of 14 queries per domain, so a
+// run covers proportionally more domains in the same budget.
+const MAX_UNIQUE_DOMAINS_WITH_DKIM = 1_500;
+const MAX_UNIQUE_DOMAINS = 3_500;
 const SCAN_CONCURRENCY = 60;
 
 // Leaves ~60s of the 300s function budget for parsing, CSV generation and the Resend
@@ -81,27 +86,36 @@ export async function POST(request: Request) {
     }
 
     const domains = getUniqueDomains(parsed);
+    const includeDkim = formData.get("includeDkim") === "on";
+    const domainCap = includeDkim ? MAX_UNIQUE_DOMAINS_WITH_DKIM : MAX_UNIQUE_DOMAINS;
 
     if (domains.length === 0) {
       return NextResponse.json({ error: "No valid email addresses were found in the CSV." }, { status: 400 });
     }
 
-    if (domains.length > MAX_UNIQUE_DOMAINS) {
-      return NextResponse.json({ error: `Too many unique domains. Max unique domains is ${MAX_UNIQUE_DOMAINS}.` }, { status: 400 });
+    if (domains.length > domainCap) {
+      return NextResponse.json(
+        {
+          error: includeDkim
+            ? `Too many unique domains for a DKIM scan. Max is ${domainCap.toLocaleString()} with DKIM probing, or ${MAX_UNIQUE_DOMAINS.toLocaleString()} without it.`
+            : `Too many unique domains. Max unique domains is ${domainCap.toLocaleString()}.`,
+        },
+        { status: 400 },
+      );
     }
 
     // Domain-level results are shared across every upload, and a public tool sees
     // the same popular domains constantly, so the cache cuts both wall clock and
     // resolver load. Only the misses get scanned.
-    const cached = await getCachedDomains(domains);
+    const cached = await getCachedDomains(domains, includeDkim);
     const uncached = domains.filter((domain) => !cached.has(domain));
-    const scanned = await scanDomains(uncached, SCAN_CONCURRENCY, SCAN_BUDGET_MS);
-    await cacheDomains(scanned);
+    const scanned = await scanDomains(uncached, SCAN_CONCURRENCY, SCAN_BUDGET_MS, includeDkim);
+    await cacheDomains(scanned, includeDkim);
 
     const scanResults = new Map([...cached, ...scanned]);
     const skipped = [...scanned.values()].filter((result) => result.error === SKIPPED_ERROR).length;
     console.log(
-      `Scan: ${domains.length} domains, ${cached.size} cached, ${scanned.size - skipped} resolved, ${skipped} skipped`,
+      `Scan: ${domains.length} domains, ${cached.size} cached, ${scanned.size - skipped} resolved, ${skipped} skipped, dkim=${includeDkim}`,
     );
 
     const enriched = await buildEnrichedCsv(parsed, scanResults);

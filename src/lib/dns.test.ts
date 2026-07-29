@@ -53,7 +53,7 @@ describe("resolver round-robin and failover", () => {
     }) as typeof fetch;
 
     // Domain at position 0 is pinned to Google, which is failing here.
-    const result = await scanDomain("a.com", 0);
+    const result = await scanDomain("a.com", { resolverIndex: 0 });
 
     expect(hosts).toContain("cloudflare-dns.com");
     expect(result.error).toBeUndefined();
@@ -64,7 +64,7 @@ describe("resolver round-robin and failover", () => {
   it("reports an error when every resolver fails", async () => {
     globalThis.fetch = (async () => new Response("boom", { status: 500 })) as typeof fetch;
 
-    const result = await scanDomain("a.com", 0);
+    const result = await scanDomain("a.com", { resolverIndex: 0 });
 
     expect(result.error).toBeTruthy();
     expect(result.mx.status).toBe("error");

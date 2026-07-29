@@ -27,12 +27,15 @@ describe("checkRateLimit", () => {
 
   it("starts a new window once the old one expires", async () => {
     const key = `test:expiry:${process.hrtime.bigint()}`;
+    // 40ms, not 1ms: two sequential calls must reliably land inside the same window,
+    // and under parallel test load a 1ms window can lapse between them.
+    const windowMs = 40;
 
-    expect((await checkRateLimit(key, 1, 1)).allowed).toBe(true);
-    expect((await checkRateLimit(key, 1, 1)).allowed).toBe(false);
+    expect((await checkRateLimit(key, 1, windowMs)).allowed).toBe(true);
+    expect((await checkRateLimit(key, 1, windowMs)).allowed).toBe(false);
 
-    await new Promise((resolve) => setTimeout(resolve, 5));
-    expect((await checkRateLimit(key, 1, 1)).allowed).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, windowMs * 3));
+    expect((await checkRateLimit(key, 1, windowMs)).allowed).toBe(true);
   });
 });
 

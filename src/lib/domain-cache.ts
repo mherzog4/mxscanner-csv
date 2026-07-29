@@ -24,8 +24,12 @@ const TTL_SECONDS = 12 * 60 * 60;
 // batches rather than 10,000 at once.
 const BATCH = 100;
 
-function key(domain: string) {
-  return `mxscan:${CACHE_VERSION}:${domain}`;
+// The mode is part of the key, not just the value. A run without DKIM stores
+// dkim.status = "not_checked"; without the mode in the key, a later DKIM run would get
+// that entry back as a hit and silently report no DKIM data for a check the user
+// explicitly asked for.
+function key(domain: string, includeDkim: boolean) {
+  return `mxscan:${CACHE_VERSION}:${includeDkim ? "dkim" : "base"}:${domain}`;
 }
 
 // A failed scan says nothing about the domain, only about that attempt. Caching it
@@ -54,14 +58,14 @@ async function inBatches<T, R>(items: T[], size: number, fn: (item: T) => Promis
   return out;
 }
 
-export async function getCachedDomains(domains: string[]): Promise<Map<string, DomainScanResult>> {
+export async function getCachedDomains(domains: string[], includeDkim = false): Promise<Map<string, DomainScanResult>> {
   const hits = new Map<string, DomainScanResult>();
   const store = cache();
   if (!store || domains.length === 0) return hits;
 
   try {
     const entries = await inBatches(domains, BATCH, async (domain) => {
-      const value = (await store.get(key(domain))) as DomainScanResult | undefined;
+      const value = (await store.get(key(domain, includeDkim))) as DomainScanResult | undefined;
       return [domain, value] as const;
     });
 
@@ -77,7 +81,7 @@ export async function getCachedDomains(domains: string[]): Promise<Map<string, D
   return hits;
 }
 
-export async function cacheDomains(results: Map<string, DomainScanResult>) {
+export async function cacheDomains(results: Map<string, DomainScanResult>, includeDkim = false) {
   const store = cache();
   if (!store || results.size === 0) return;
 
@@ -86,7 +90,7 @@ export async function cacheDomains(results: Map<string, DomainScanResult>) {
 
   try {
     await inBatches(entries, BATCH, ([domain, result]) =>
-      store.set(key(domain), result, { ttl: TTL_SECONDS, tags: ["domain-scan"], name: "domain-scan" }),
+      store.set(key(domain, includeDkim), result, { ttl: TTL_SECONDS, tags: ["domain-scan"], name: "domain-scan" }),
     );
   } catch (error) {
     // Best-effort: the report is already correct without a write.

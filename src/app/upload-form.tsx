@@ -50,10 +50,17 @@ export function UploadForm() {
         Prospect CSV
         <input name="file" type="file" accept=".csv,text/csv" required disabled={state.status === "submitting"} />
       </label>
+      <label className="checkbox-row">
+        <input name="includeDkim" type="checkbox" disabled={state.status === "submitting"} />
+        <span>
+          Probe DKIM selectors
+          <em>More than doubles DNS work, so the domain limit drops to 1,500.</em>
+        </span>
+      </label>
       <button type="submit" disabled={state.status === "submitting"}>
         {state.status === "submitting" ? "Scanning domains..." : "Scan and email enriched CSV"}
       </button>
-      <p className="fine-print">Limits: 25 MB CSV, 25,000 rows, 1,500 unique domains.</p>
+      <p className="fine-print">Limits: 25 MB CSV, 25,000 rows, 3,500 unique domains.</p>
       {state.status === "success" ? <p className="form-status success">{state.message}</p> : null}
       {state.status === "error" ? <p className="form-status error">{state.message}</p> : null}
     </form>

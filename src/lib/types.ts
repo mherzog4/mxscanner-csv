@@ -62,7 +62,9 @@ export type DomainScanResult = {
     record?: string;
   };
   dkim: {
-    status: PolicyStatus;
+    // "not_checked" when DKIM probing was off for the run — distinct from "missing",
+    // which means selectors were probed and none matched.
+    status: PolicyStatus | "not_checked";
     selectors: string[];
   };
   classification: EmailSecurityClassification;
