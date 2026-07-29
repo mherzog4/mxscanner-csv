@@ -67,10 +67,16 @@ export async function buildEnrichedCsv(parsed: ParsedCsv, scanResults: Map<strin
     "dmarc_record",
     "mx_scan_notes",
     "mx_scan_error",
+    "mx_primary_host",
     "mx_provider_evidence",
     "seg_evidence_record_type",
     "seg_evidence_record",
     "dnssec_ad",
+    "mta_sts_status",
+    "tls_rpt_status",
+    "bimi_status",
+    "dkim_status",
+    "dkim_selectors",
   ];
   const outputRows: Record<string, string>[] = [];
   const providerCounts: Record<string, number> = {};
@@ -104,14 +110,21 @@ export async function buildEnrichedCsv(parsed: ParsedCsv, scanResults: Map<strin
       dmarc_record: result?.dmarc.record ?? "",
       mx_scan_notes: result?.notes.join("; ") ?? (domain ? "" : "Invalid or missing email"),
       mx_scan_error: result?.error ?? (domain ? "" : "Invalid or missing email"),
+      mx_primary_host: result?.mx.primaryHost ?? "",
       mx_provider_evidence: result ? formatProviderEvidence(result) : "",
       seg_evidence_record_type: firstSegEvidence?.recordType ?? "",
       seg_evidence_record: firstSegEvidence?.record ?? "",
       dnssec_ad: result?.dnssec ? String(result.dnssec.ad) : "",
+      mta_sts_status: result?.mtaSts.status ?? "",
+      tls_rpt_status: result?.tlsRpt.status ?? "",
+      bimi_status: result?.bimi.status ?? "",
+      dkim_status: result?.dkim.status ?? "",
+      dkim_selectors: result?.dkim.selectors.join("; ") ?? "",
     });
   }
 
   const csv = await formatRows([...parsed.headers, ...appendedHeaders], outputRows);
+  const scanned = [...scanResults.values()];
 
   return {
     csv,
@@ -120,7 +133,15 @@ export async function buildEnrichedCsv(parsed: ParsedCsv, scanResults: Map<strin
       totalValidEmails: validEmails,
       totalUniqueDomains: scanResults.size,
       providerCounts,
-      unknownDomains: [...scanResults.values()].filter((result) => !result.classification.securityGateway).length,
+      unknownDomains: scanned.filter((result) => !result.classification.securityGateway).length,
+      deliverability: {
+        // Domain-level, not row-level: these count unique domains scanned.
+        dmarcEnforced: scanned.filter((r) => r.dmarc.policy === "quarantine" || r.dmarc.policy === "reject").length,
+        spfMissing: scanned.filter((r) => r.spf.status === "missing" || r.spf.status === "multiple").length,
+        dkimFound: scanned.filter((r) => r.dkim.status === "present").length,
+        mtaStsFound: scanned.filter((r) => r.mtaSts.status === "present").length,
+        bimiFound: scanned.filter((r) => r.bimi.status === "present").length,
+      },
     },
   };
 }

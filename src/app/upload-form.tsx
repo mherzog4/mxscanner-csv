@@ -15,23 +15,29 @@ export function UploadForm() {
     event.preventDefault();
     setState({ status: "submitting" });
 
-    const formData = new FormData(event.currentTarget);
-    const response = await fetch("/api/scan", {
-      method: "POST",
-      body: formData,
-    });
-    const data = (await response.json()) as { error?: string; summary?: { totalUniqueDomains: number; totalRows: number } };
+    // React nulls out currentTarget once the handler returns, and a scan takes
+    // ~30s — so hold the form element across the await instead of re-reading it.
+    const form = event.currentTarget;
+    const formData = new FormData(form);
 
-    if (!response.ok) {
-      setState({ status: "error", message: data.error ?? "Scan failed. Please try again." });
-      return;
+    try {
+      const response = await fetch("/api/scan", { method: "POST", body: formData });
+      const data = (await response.json()) as { error?: string; summary?: { totalUniqueDomains: number; totalRows: number } };
+
+      if (!response.ok) {
+        setState({ status: "error", message: data.error ?? "Scan failed. Please try again." });
+        return;
+      }
+
+      setState({
+        status: "success",
+        message: `Report queued and emailed. Scanned ${data.summary?.totalUniqueDomains ?? 0} unique domains across ${data.summary?.totalRows ?? 0} rows.`,
+      });
+      form.reset();
+    } catch {
+      // Without this the button stays stuck on "Scanning domains..." forever.
+      setState({ status: "error", message: "Network error. Check your connection and try again." });
     }
-
-    setState({
-      status: "success",
-      message: `Report queued and emailed. Scanned ${data.summary?.totalUniqueDomains ?? 0} unique domains across ${data.summary?.totalRows ?? 0} rows.`,
-    });
-    event.currentTarget.reset();
   }
 
   return (
