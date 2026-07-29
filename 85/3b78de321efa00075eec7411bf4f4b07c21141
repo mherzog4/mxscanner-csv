@@ -1,0 +1,25 @@
+.env.example
+  s_2eadf031bf0ea9::t_0ad3046c501d79 3-5,7
+src/lib/email.ts
+  s_2eadf031bf0ea9::t_a47a054b495413 67
+  s_2eadf031bf0ea9::t_70382131d739f0 56-60
+  s_2eadf031bf0ea9::t_7a1702908550f3 5-8,10-13
+README.md
+  s_2eadf031bf0ea9::t_d185c92c5d4828 49-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "853b78de321efa00075eec7411bf4f4b07c21141",
+  "prompts": {},
+  "sessions": {
+    "s_2eadf031bf0ea9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44fa907e-e5fc-4da8-a477-8d4370b97490",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Mherzog4 <matthewherzog4@gmail.com>"
+    }
+  }
+}
