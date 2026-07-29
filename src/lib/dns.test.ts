@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { getPrimaryMxHost, scanDomain, scanDomains } from "./dns";
+import { SKIPPED_ERROR, getPrimaryMxHost, scanDomain, scanDomains } from "./dns";
 
 describe("getPrimaryMxHost", () => {
   it("picks the lowest-preference host and strips the trailing dot", () => {
@@ -68,5 +68,43 @@ describe("resolver round-robin and failover", () => {
 
     expect(result.error).toBeTruthy();
     expect(result.mx.status).toBe("error");
+  });
+});
+
+describe("scan time budget", () => {
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  it("marks domains it never reached instead of dropping them", async () => {
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls++;
+      await new Promise((r) => setTimeout(r, 5));
+      return new Response(JSON.stringify({ Status: 0, Answer: [] }), { status: 200 });
+    }) as typeof fetch;
+
+    const domains = Array.from({ length: 40 }, (_, i) => `d${i}.example.com`);
+    // Budget expires almost immediately, so most domains are never attempted.
+    const results = await scanDomains(domains, 2, 12);
+
+    // Every domain still has a row — nothing is silently missing.
+    expect(results.size).toBe(domains.length);
+
+    const skipped = [...results.values()].filter((r) => r.error === SKIPPED_ERROR);
+    expect(skipped.length).toBeGreaterThan(0);
+    expect(skipped[0]!.notes[0]).toContain("time budget");
+    // And it actually stopped issuing queries rather than running to completion.
+    expect(calls).toBeLessThan(domains.length * 14);
+  });
+
+  it("scans everything when the budget is ample", async () => {
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ Status: 0, Answer: [] }), { status: 200 })) as typeof fetch;
+
+    const results = await scanDomains(["a.com", "b.com"], 2, 60_000);
+
+    expect([...results.values()].every((r) => r.error !== SKIPPED_ERROR)).toBe(true);
   });
 });

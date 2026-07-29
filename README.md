@@ -84,13 +84,20 @@ If none of those headers exist, the scanner attempts to detect email-like values
 
 - Max file size: 25 MB
 - Max rows: 25,000
-- Max unique domains: 10,000
+- Max unique domains: 1,500
 - DNS concurrency: 60
 
-These are sized from measurement, not caution. With two DoH resolvers at
-concurrency 60, 1,000 domains (14 queries each) resolve in 3-5 seconds, so 10,000
-domains fits inside the 300s function budget with room for dead domains that burn
-the full 10s abort.
+The domain cap is set from **production** measurement, and the first number was
+wrong. A local benchmark showed ~320 domains/sec against the DoH resolvers, so the cap
+was initially set to 10,000. A deployed function then failed to finish 5,000 domains
+inside the 300s limit — under ~17/sec effective — and delivered nothing at all. Public
+resolvers throttle datacenter egress far harder than a residential connection, and the
+local run also benefited from warm parent-zone NS caches. Do not trust laptop DNS
+throughput numbers for serverless.
+
+The scan also carries a 240s internal budget. Domains not reached before it expires
+come back marked (`mx_scan_error` says the budget was exhausted) so a long run degrades
+into a partial report instead of being killed mid-flight with nothing delivered.
 
 The binding constraints are elsewhere:
 

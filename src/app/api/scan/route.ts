@@ -1,7 +1,7 @@
 import { checkBotId } from "botid/server";
 import { NextResponse } from "next/server";
 import { buildEnrichedCsv, getUniqueDomains, parseCsv } from "@/lib/csv-enrichment";
-import { scanDomains } from "@/lib/dns";
+import { SKIPPED_ERROR, scanDomains } from "@/lib/dns";
 import { cacheDomains, getCachedDomains } from "@/lib/domain-cache";
 import { addContact, sendReportEmail } from "@/lib/email";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -11,13 +11,21 @@ export const runtime = "nodejs";
 // can raise this to 800s if the domain cap ever grows past what fits here.
 export const maxDuration = 300;
 
-// Measured, not guessed: with two DoH resolvers at concurrency 60, 1,000 domains
-// (14 queries each) complete in 3-5s. 10,000 domains lands well inside the 300s
-// budget even allowing for dead domains that burn the full 10s abort.
 const MAX_FILE_BYTES = 25_000_000;
 const MAX_ROWS = 25_000;
-const MAX_UNIQUE_DOMAINS = 10_000;
+
+// Measured in production, not extrapolated from a laptop. A local benchmark showed
+// ~320 domains/sec against the DoH resolvers, but a deployed function did not finish
+// 5,000 domains inside 300s — under ~17/sec effective. Public resolvers throttle
+// datacenter egress far harder than residential, and the local run also benefited
+// from warm parent-zone NS caches. 1,500 sits well under the observed failure point.
+const MAX_UNIQUE_DOMAINS = 1_500;
 const SCAN_CONCURRENCY = 60;
+
+// Leaves ~60s of the 300s function budget for parsing, CSV generation and the Resend
+// upload. A run that outgrows this returns a report with the unreached domains marked
+// rather than being killed mid-flight and delivering nothing.
+const SCAN_BUDGET_MS = 240_000;
 // Resend's hard limit is 40 MB post-base64; leave room for the HTML body.
 const MAX_ATTACHMENT_BYTES = 38_000_000;
 
@@ -87,11 +95,14 @@ export async function POST(request: Request) {
     // resolver load. Only the misses get scanned.
     const cached = await getCachedDomains(domains);
     const uncached = domains.filter((domain) => !cached.has(domain));
-    const scanned = await scanDomains(uncached, SCAN_CONCURRENCY);
+    const scanned = await scanDomains(uncached, SCAN_CONCURRENCY, SCAN_BUDGET_MS);
     await cacheDomains(scanned);
 
     const scanResults = new Map([...cached, ...scanned]);
-    console.log(`Scan: ${domains.length} domains, ${cached.size} cached, ${scanned.size} resolved`);
+    const skipped = [...scanned.values()].filter((result) => result.error === SKIPPED_ERROR).length;
+    console.log(
+      `Scan: ${domains.length} domains, ${cached.size} cached, ${scanned.size - skipped} resolved, ${skipped} skipped`,
+    );
 
     const enriched = await buildEnrichedCsv(parsed, scanResults);
 
