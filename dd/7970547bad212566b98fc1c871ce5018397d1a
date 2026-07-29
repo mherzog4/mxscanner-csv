@@ -1,0 +1,25 @@
+src/app/page.tsx
+  s_2eadf031bf0ea9::t_794f2414114dd1 1,15,35-44
+  s_2eadf031bf0ea9::t_61fe01aba782e0 34
+src/app/styles.css
+  s_2eadf031bf0ea9::t_e2af672adb53ca 105,107-108
+  s_2eadf031bf0ea9::t_837251b444b665 175,177
+  s_2eadf031bf0ea9::t_5e9bc733e0bfd2 269-271,274-276,279-280,283-285
+  s_2eadf031bf0ea9::t_8694b458cfeac3 561-562,565-566
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "dd7970547bad212566b98fc1c871ce5018397d1a",
+  "prompts": {},
+  "sessions": {
+    "s_2eadf031bf0ea9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44fa907e-e5fc-4da8-a477-8d4370b97490",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Mherzog4 <matthewherzog4@gmail.com>"
+    }
+  }
+}
