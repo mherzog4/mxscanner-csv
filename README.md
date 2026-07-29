@@ -98,14 +98,36 @@ The binding constraints are elsewhere:
   size before sending and returns a 413 with instructions rather than letting
   Resend reject a completed scan.
 - **Resolver fair use.** 14 queries per domain means a 10,000-domain scan issues
-  140,000 queries. Splitting across two providers halves what either one sees.
-  Adding a cross-request cache would cut it much further, since public lead
-  magnets see the same popular domains repeatedly.
+  140,000 queries. Splitting across two providers halves what either one sees, and
+  the domain cache below removes repeats entirely.
 - **The wait is synchronous.** A large scan holds the request open with no
   progress indicator. Past a couple of minutes this wants a background job.
 
 `maxDuration` is 300s, the Fluid Compute default and the Hobby ceiling. Pro and
 Enterprise can raise it to 800s.
+
+## Domain Cache
+
+Scan results are cached per domain in Vercel's [Runtime Cache](https://vercel.com/docs/runtime-cache)
+for 12 hours. Findings are domain-level, not person-level, so they are reusable across
+uploads — and a public lead magnet sees the same popular domains constantly. Every hit
+is 14 DNS queries not sent.
+
+Runtime Cache ships with the platform, which keeps this free. Upstash Redis was
+evaluated and rejected: its free tier caps at 10,000 requests per day and throws past
+that, so one large scan would exhaust a day's quota.
+
+Two properties to know:
+
+- **Per-region and LRU-evicted.** Hit rates vary by where the function runs, and
+  entries can disappear before their TTL. Neither can produce a wrong report — a miss
+  just means scanning the domain, which is the no-cache behaviour.
+- **Failed scans are never cached.** An error describes the attempt, not the domain.
+  Caching one would pin a transient DNS blip to every report for 12 hours.
+
+The cache key carries a version (`mxscan:v1:{domain}`). Bump `CACHE_VERSION` in
+`src/lib/domain-cache.ts` whenever `DomainScanResult` gains a field, or old entries
+will keep serving rows missing the new columns.
 
 ## Enriched CSV Columns
 

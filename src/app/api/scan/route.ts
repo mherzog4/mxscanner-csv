@@ -2,6 +2,7 @@ import { checkBotId } from "botid/server";
 import { NextResponse } from "next/server";
 import { buildEnrichedCsv, getUniqueDomains, parseCsv } from "@/lib/csv-enrichment";
 import { scanDomains } from "@/lib/dns";
+import { cacheDomains, getCachedDomains } from "@/lib/domain-cache";
 import { addContact, sendReportEmail } from "@/lib/email";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -81,7 +82,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Too many unique domains. Max unique domains is ${MAX_UNIQUE_DOMAINS}.` }, { status: 400 });
     }
 
-    const scanResults = await scanDomains(domains, SCAN_CONCURRENCY);
+    // Domain-level results are shared across every upload, and a public tool sees
+    // the same popular domains constantly, so the cache cuts both wall clock and
+    // resolver load. Only the misses get scanned.
+    const cached = await getCachedDomains(domains);
+    const uncached = domains.filter((domain) => !cached.has(domain));
+    const scanned = await scanDomains(uncached, SCAN_CONCURRENCY);
+    await cacheDomains(scanned);
+
+    const scanResults = new Map([...cached, ...scanned]);
+    console.log(`Scan: ${domains.length} domains, ${cached.size} cached, ${scanned.size} resolved`);
+
     const enriched = await buildEnrichedCsv(parsed, scanResults);
 
     // Resend caps a message at 40 MB *after* base64, which inflates by 4/3. At the
