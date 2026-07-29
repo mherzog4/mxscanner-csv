@@ -53,7 +53,7 @@ export function UploadForm() {
       <button type="submit" disabled={state.status === "submitting"}>
         {state.status === "submitting" ? "Scanning domains..." : "Scan and email enriched CSV"}
       </button>
-      <p className="fine-print">MVP limits: 1 MB CSV, 5,000 rows, 500 unique domains.</p>
+      <p className="fine-print">Limits: 25 MB CSV, 25,000 rows, 10,000 unique domains.</p>
       {state.status === "success" ? <p className="form-status success">{state.message}</p> : null}
       {state.status === "error" ? <p className="form-status error">{state.message}</p> : null}
     </form>

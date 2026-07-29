@@ -2,7 +2,7 @@
 
 Open-source lead magnet that enriches a prospect CSV with domain-level email security gateway findings.
 
-Upload a CSV of email addresses, scan each unique domain through Google Public DNS, append MX/SEG/SPF/DMARC findings as new columns, and email the enriched CSV back with Resend.
+Upload a CSV of email addresses, scan each unique domain over DNS-over-HTTPS, append MX/SEG/SPF/DMARC findings as new columns, and email the enriched CSV back with Resend.
 
 ## What It Detects
 
@@ -28,11 +28,13 @@ MX evidence assigns every role a rule claims except outbound sender, so a Micros
 
 - Next.js App Router
 - TypeScript
-- Google Public DNS JSON API
+- DNS-over-HTTPS (Google + Cloudflare, round-robin with failover)
 - `@fast-csv/parse` and `@fast-csv/format`
 - Resend
 
-The MVP uses Google Public DNS because it is simple, serverless-friendly, and fast enough for a public lead magnet. Native DNS resolution can be added later if API throughput becomes the bottleneck.
+Queries go out over DNS-over-HTTPS, spread across Google and Cloudflare by domain so neither provider absorbs the whole scan, with automatic failover to the other on error.
+
+Node's built-in `dns` module is deliberately not used. It sounds like the faster option, but in serverless it resolves through the platform resolver, which rate-limits at roughly 1,000 packets per second per network interface. Measured at the concurrency this scan needs, it managed ~25 domains/sec and returned `EREFUSED`/`ETIMEOUT`, against ~320 domains/sec over DoH with no throttling.
 
 ## Local Setup
 
@@ -80,12 +82,30 @@ If none of those headers exist, the scanner attempts to detect email-like values
 
 ## Limits
 
-MVP limits are intentionally conservative:
+- Max file size: 25 MB
+- Max rows: 25,000
+- Max unique domains: 10,000
+- DNS concurrency: 60
 
-- Max file size: 1 MB
-- Max rows: 5,000
-- Max unique domains: 500
-- DNS concurrency: 20
+These are sized from measurement, not caution. With two DoH resolvers at
+concurrency 60, 1,000 domains (14 queries each) resolve in 3-5 seconds, so 10,000
+domains fits inside the 300s function budget with room for dead domains that burn
+the full 10s abort.
+
+The binding constraints are elsewhere:
+
+- **Resend caps a message at 40 MB after base64.** The route checks the encoded
+  size before sending and returns a 413 with instructions rather than letting
+  Resend reject a completed scan.
+- **Resolver fair use.** 14 queries per domain means a 10,000-domain scan issues
+  140,000 queries. Splitting across two providers halves what either one sees.
+  Adding a cross-request cache would cut it much further, since public lead
+  magnets see the same popular domains repeatedly.
+- **The wait is synchronous.** A large scan holds the request open with no
+  progress indicator. Past a couple of minutes this wants a background job.
+
+`maxDuration` is 300s, the Fluid Compute default and the Hobby ceiling. Pro and
+Enterprise can raise it to 800s.
 
 ## Enriched CSV Columns
 
@@ -133,7 +153,7 @@ default._bimi.{domain}        BIMI record
 ```
 
 DKIM selectors cannot be enumerated from DNS — they can only be guessed — so the
-probe list in `src/lib/dns-google.ts` covers common mailbox and ESP defaults.
+probe list in `src/lib/dns.ts` covers common mailbox and ESP defaults.
 A missing selector means "not found on a common name", not "no DKIM".
 
 ## Provider Rules

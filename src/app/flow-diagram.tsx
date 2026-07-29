@@ -14,7 +14,7 @@ const STEPS = {
         report should be delivered to. Nothing is stored server-side.
       </>
     ),
-    code: "POST /api/scan\n  file:  prospects.csv  (≤1 MB)\n  email: you@company.com",
+    code: "POST /api/scan\n  file:  prospects.csv  (≤25 MB)\n  email: you@company.com",
   },
   guard: {
     title: "Bot + abuse checks",
@@ -32,7 +32,7 @@ const STEPS = {
     meta: "fast-csv · headers auto-detected",
     body: (
       <>
-        Streams the CSV, caps it at 5,000 rows, and finds the email column automatically — first by header name (
+        Streams the CSV, caps it at 25,000 rows, and finds the email column automatically — first by header name (
         <code>email</code>, <code>work_email</code>…), then by sniffing which column actually contains addresses.
       </>
     ),
@@ -43,7 +43,7 @@ const STEPS = {
     meta: "the trick that makes it fast",
     body: (
       <>
-        5,000 prospects usually share a few hundred companies. DNS is per-domain, not per-person — so the scanner
+        25,000 prospects usually share far fewer companies. DNS is per-domain, not per-person — so the scanner
         extracts each address&apos;s domain, lowercases it, and scans the unique set once (max 500).
       </>
     ),
@@ -51,7 +51,7 @@ const STEPS = {
   },
   dns: {
     title: "DNS scan per domain",
-    meta: "Google Public DNS · 20 workers · 10s timeout",
+    meta: "2 DoH resolvers · 60 workers · 10s timeout",
     body: (
       <>
         Fourteen queries fire in parallel for every domain over DNS-over-HTTPS: MX, TXT (for SPF),{" "}
@@ -216,7 +216,7 @@ export function FlowDiagram() {
             <FlowNode k="upload" className="term" {...nodeProps}>
               <rect x="210" y="12" width="200" height="44" />
               <text x="310" y="32" textAnchor="middle">Upload CSV + your email</text>
-              <text className="sub" x="310" y="47" textAnchor="middle">up to 5,000 prospect rows</text>
+              <text className="sub" x="310" y="47" textAnchor="middle">up to 25,000 prospect rows</text>
             </FlowNode>
 
             <FlowNode k="guard" {...nodeProps}>
@@ -234,7 +234,7 @@ export function FlowDiagram() {
             <FlowNode k="dedupe" {...nodeProps}>
               <rect x="210" y="260" width="200" height="48" />
               <text x="310" y="280" textAnchor="middle">Dedupe to unique domains</text>
-              <text className="sub" x="310" y="296" textAnchor="middle">5,000 rows → ≤500 domains</text>
+              <text className="sub" x="310" y="296" textAnchor="middle">25,000 rows → ≤10,000 domains</text>
             </FlowNode>
 
             <FlowNode k="dns" {...nodeProps}>

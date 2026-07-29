@@ -1,19 +1,24 @@
 import { checkBotId } from "botid/server";
 import { NextResponse } from "next/server";
 import { buildEnrichedCsv, getUniqueDomains, parseCsv } from "@/lib/csv-enrichment";
-import { scanDomains } from "@/lib/dns-google";
+import { scanDomains } from "@/lib/dns";
 import { addContact, sendReportEmail } from "@/lib/email";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
-// Worst case: 500 domains / 20 concurrency * 10s DNS timeout ≈ 250s. If
-// MAX_UNIQUE_DOMAINS grows past this budget, move the scan to a background job.
+// 300s is the Fluid Compute default and the hard ceiling on Hobby. Pro/Enterprise
+// can raise this to 800s if the domain cap ever grows past what fits here.
 export const maxDuration = 300;
 
-const MAX_FILE_BYTES = 1_000_000;
-const MAX_ROWS = 5_000;
-const MAX_UNIQUE_DOMAINS = 500;
-const SCAN_CONCURRENCY = 20;
+// Measured, not guessed: with two DoH resolvers at concurrency 60, 1,000 domains
+// (14 queries each) complete in 3-5s. 10,000 domains lands well inside the 300s
+// budget even allowing for dead domains that burn the full 10s abort.
+const MAX_FILE_BYTES = 25_000_000;
+const MAX_ROWS = 25_000;
+const MAX_UNIQUE_DOMAINS = 10_000;
+const SCAN_CONCURRENCY = 60;
+// Resend's hard limit is 40 MB post-base64; leave room for the HTML body.
+const MAX_ATTACHMENT_BYTES = 38_000_000;
 
 export async function POST(request: Request) {
   try {
@@ -49,7 +54,10 @@ export async function POST(request: Request) {
     }
 
     if (file.size > MAX_FILE_BYTES) {
-      return NextResponse.json({ error: "CSV is too large. Max size is 1 MB." }, { status: 400 });
+      return NextResponse.json(
+        { error: `CSV is too large. Max size is ${MAX_FILE_BYTES / 1_000_000} MB.` },
+        { status: 400 },
+      );
     }
 
     const csvText = await file.text();
@@ -75,6 +83,22 @@ export async function POST(request: Request) {
 
     const scanResults = await scanDomains(domains, SCAN_CONCURRENCY);
     const enriched = await buildEnrichedCsv(parsed, scanResults);
+
+    // Resend caps a message at 40 MB *after* base64, which inflates by 4/3. At the
+    // upload limit a wide CSV plus 24 appended columns can cross that. Checked here
+    // so the failure is an actionable message rather than an opaque Resend error
+    // thrown away after a full scan.
+    const encodedBytes = Math.ceil(Buffer.byteLength(enriched.csv, "utf8") / 3) * 4;
+    if (encodedBytes > MAX_ATTACHMENT_BYTES) {
+      return NextResponse.json(
+        {
+          error:
+            "The enriched CSV is too large to email (over 40 MB encoded). Split the file into smaller batches and scan them separately.",
+        },
+        { status: 413 },
+      );
+    }
+
     const attachmentName = makeAttachmentName(file.name);
     const emailResult = await sendReportEmail({
       to: email,
