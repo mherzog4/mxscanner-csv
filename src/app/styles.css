@@ -289,6 +289,11 @@ input:disabled {
   color: var(--ink);
 }
 
+.form-status.running {
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  color: var(--ink);
+}
+
 .form-status.error {
   background: color-mix(in srgb, var(--danger) 14%, var(--panel));
   color: var(--ink);

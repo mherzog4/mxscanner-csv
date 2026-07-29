@@ -1,15 +1,16 @@
+import { randomUUID } from "node:crypto";
+import { put } from "@vercel/blob";
 import { checkBotId } from "botid/server";
 import { NextResponse } from "next/server";
-import { buildEnrichedCsv, getUniqueDomains, parseCsv } from "@/lib/csv-enrichment";
-import { SKIPPED_ERROR, scanDomains } from "@/lib/dns";
-import { cacheDomains, getCachedDomains } from "@/lib/domain-cache";
-import { addContact, sendReportEmail } from "@/lib/email";
+import { start } from "workflow/api";
+import { getUniqueDomains, parseCsv } from "@/lib/csv-enrichment";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { scanWorkflow } from "@/lib/scan-workflow";
 
 export const runtime = "nodejs";
-// 300s is the Fluid Compute default and the hard ceiling on Hobby. Pro/Enterprise
-// can raise this to 800s if the domain cap ever grows past what fits here.
-export const maxDuration = 300;
+// This route no longer scans. It validates, stores the upload and hands off to a
+// durable workflow, so it finishes in seconds regardless of job size.
+export const maxDuration = 60;
 
 const MAX_FILE_BYTES = 25_000_000;
 const MAX_ROWS = 25_000;
@@ -104,52 +105,23 @@ export async function POST(request: Request) {
       );
     }
 
-    // Domain-level results are shared across every upload, and a public tool sees
-    // the same popular domains constantly, so the cache cuts both wall clock and
-    // resolver load. Only the misses get scanned.
-    const cached = await getCachedDomains(domains, includeDkim);
-    const uncached = domains.filter((domain) => !cached.has(domain));
-    const scanned = await scanDomains(uncached, SCAN_CONCURRENCY, SCAN_BUDGET_MS, includeDkim);
-    await cacheDomains(scanned, includeDkim);
+    // Hand off to a durable workflow instead of scanning inline. Each chunk becomes
+    // its own step with its own duration budget, so total work is no longer bounded by
+    // this request — which is what killed a 5,000-domain scan on the old path.
+    const jobId = randomUUID();
+    const csvPathname = `jobs/${jobId}/upload.csv`;
+    await put(csvPathname, csvText, { access: "private", contentType: "text/csv" });
 
-    const scanResults = new Map([...cached, ...scanned]);
-    const skipped = [...scanned.values()].filter((result) => result.error === SKIPPED_ERROR).length;
-    console.log(
-      `Scan: ${domains.length} domains, ${cached.size} cached, ${scanned.size - skipped} resolved, ${skipped} skipped, dkim=${includeDkim}`,
+    const run = await start(scanWorkflow, [
+      { id: jobId, csvPathname, email, fileName: makeAttachmentName(file.name), includeDkim },
+    ]);
+
+    console.log(`Job ${jobId}: queued ${domains.length} domains, dkim=${includeDkim}, run=${run.runId}`);
+
+    return NextResponse.json(
+      { ok: true, runId: run.runId, domainCount: domains.length, rowCount: parsed.rows.length },
+      { status: 202 },
     );
-
-    const enriched = await buildEnrichedCsv(parsed, scanResults);
-
-    // Resend caps a message at 40 MB *after* base64, which inflates by 4/3. At the
-    // upload limit a wide CSV plus 24 appended columns can cross that. Checked here
-    // so the failure is an actionable message rather than an opaque Resend error
-    // thrown away after a full scan.
-    const encodedBytes = Math.ceil(Buffer.byteLength(enriched.csv, "utf8") / 3) * 4;
-    if (encodedBytes > MAX_ATTACHMENT_BYTES) {
-      return NextResponse.json(
-        {
-          error:
-            "The enriched CSV is too large to email (over 40 MB encoded). Split the file into smaller batches and scan them separately.",
-        },
-        { status: 413 },
-      );
-    }
-
-    const attachmentName = makeAttachmentName(file.name);
-    const emailResult = await sendReportEmail({
-      to: email,
-      csv: enriched.csv,
-      fileName: attachmentName,
-      summary: enriched.summary,
-    });
-
-    await addContact(email);
-
-    return NextResponse.json({
-      ok: true,
-      messageId: emailResult?.id,
-      summary: enriched.summary,
-    });
   } catch (error) {
     console.error("Scan failed:", error);
     return NextResponse.json({ error: "Unexpected scan error. Try again." }, { status: 500 });

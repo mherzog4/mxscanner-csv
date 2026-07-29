@@ -15,12 +15,14 @@
     "@fast-csv/parse": "^5.0.5",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
+    "@vercel/blob": "^2.6.1",
     "@vercel/functions": "^3.7.6",
     "botid": "^1.5.11",
     "next": "^16.2.9",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
-    "resend": "^6.6.0"
+    "resend": "^6.6.0",
+    "workflow": "^4.7.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.2",

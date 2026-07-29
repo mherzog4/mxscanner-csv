@@ -7,3 +7,5 @@ coverage/
 *.tsbuildinfo
 .vercel
 .playwright-mcp
+.env*
+/.swc
