@@ -225,8 +225,36 @@ export async function scanDomain(domain: string, resolverIndex = 0): Promise<Dom
   }
 }
 
-export async function scanDomains(domains: string[], concurrency: number) {
+export const SKIPPED_ERROR = "Scan time budget exhausted before this domain was reached";
+
+function skippedResult(domain: string): DomainScanResult {
+  return {
+    domain,
+    mx: { status: "error", records: [] },
+    spf: { status: "error", records: [] },
+    dmarc: { status: "error" },
+    mtaSts: { status: "error" },
+    tlsRpt: { status: "error" },
+    bimi: { status: "error" },
+    dkim: { status: "error", selectors: [] },
+    classification: { inboundProvider: null, mailboxProvider: null, outboundSenders: [], securityGateway: null },
+    notes: ["Not scanned: run exceeded its time budget"],
+    error: SKIPPED_ERROR,
+  };
+}
+
+// budgetMs bounds the whole batch. Without it, a run that outgrows the function's
+// maxDuration is killed mid-flight and the user gets nothing — not a partial report,
+// nothing, after waiting minutes. Real throughput against public DoH resolvers from
+// a datacenter turned out to be far below what the same code measures from a laptop,
+// so the batch has to be able to stop on its own rather than trusting a domain cap
+// to have been set correctly.
+//
+// Domains past the deadline come back marked, so every row still gets a value and the
+// report says plainly which ones were not reached.
+export async function scanDomains(domains: string[], concurrency: number, budgetMs = Number.POSITIVE_INFINITY) {
   const results = new Map<string, DomainScanResult>();
+  const deadline = Date.now() + budgetMs;
   let index = 0;
 
   async function worker() {
@@ -234,7 +262,11 @@ export async function scanDomains(domains: string[], concurrency: number) {
       const position = index++;
       const domain = domains[position];
       if (!domain) continue;
-      results.set(domain, await scanDomain(domain, position % RESOLVERS.length));
+
+      results.set(
+        domain,
+        Date.now() >= deadline ? skippedResult(domain) : await scanDomain(domain, position % RESOLVERS.length),
+      );
     }
   }
 
