@@ -1,0 +1,23 @@
+src/lib/rate-limit.ts
+  s_2eadf031bf0ea9::t_014fe27cb594d4 1,9-10,25-29,31,33-47,50-78,81,83-86,89
+src/lib/rate-limit.test.ts
+  s_2eadf031bf0ea9::t_b3ec4babd09c0b 1-54
+README.md
+  s_2eadf031bf0ea9::t_866f4c71915628 132-156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "849036eddba9f775bbb9a8a17e03a835dcbabc57",
+  "prompts": {},
+  "sessions": {
+    "s_2eadf031bf0ea9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44fa907e-e5fc-4da8-a477-8d4370b97490",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Mherzog4 <matthewherzog4@gmail.com>"
+    }
+  }
+}
