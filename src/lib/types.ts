@@ -31,11 +31,14 @@ export type EmailSecurityClassification = {
   securityGateway: ProviderDetection | null;
 };
 
+export type PolicyStatus = "present" | "missing" | "error";
+
 export type DomainScanResult = {
   domain: string;
   mx: {
     status: "present" | "missing" | "error";
     records: string[];
+    primaryHost?: string;
   };
   spf: {
     status: "present" | "missing" | "multiple" | "error";
@@ -45,6 +48,22 @@ export type DomainScanResult = {
     status: "present" | "missing" | "error";
     policy?: "none" | "quarantine" | "reject";
     record?: string;
+  };
+  mtaSts: {
+    status: PolicyStatus;
+    id?: string;
+  };
+  tlsRpt: {
+    status: PolicyStatus;
+    record?: string;
+  };
+  bimi: {
+    status: PolicyStatus;
+    record?: string;
+  };
+  dkim: {
+    status: PolicyStatus;
+    selectors: string[];
   };
   classification: EmailSecurityClassification;
   dnssec?: {
@@ -60,4 +79,11 @@ export type EnrichmentSummary = {
   totalUniqueDomains: number;
   providerCounts: Record<string, number>;
   unknownDomains: number;
+  deliverability: {
+    dmarcEnforced: number;
+    spfMissing: number;
+    dkimFound: number;
+    mtaStsFound: number;
+    bimiFound: number;
+  };
 };

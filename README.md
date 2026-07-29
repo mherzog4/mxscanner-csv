@@ -6,13 +6,16 @@ Upload a CSV of email addresses, scan each unique domain through Google Public D
 
 ## What It Detects
 
-- MX records
+- MX records and the primary (lowest-preference) MX host
 - Secure Email Gateway provider, when detectable
-- SEG confidence score
+- SEG confidence score and the DNS record it came from
 - Mailbox provider
 - Outbound senders from SPF includes
 - SPF status and record
 - DMARC status, policy, and record
+- MTA-STS, TLS-RPT, and BIMI policy presence
+- DKIM selectors found on a common-selector probe
+- DNSSEC authenticated-data flag
 - Scan notes and errors
 
 Initial provider mappings include Proofpoint, Proofpoint Essentials, Mimecast, Barracuda, Microsoft 365 / EOP, Google Workspace, Cisco Secure Email / IronPort, Sophos, Fortinet, Trend Micro, Cloudflare Area 1, Zix / AppRiver, SendGrid, Mailgun, Mailchimp, HubSpot, and Salesforce.
@@ -39,9 +42,14 @@ Set these environment variables:
 
 ```bash
 RESEND_API_KEY=re_...
-EMAIL_FROM="MX Scanner <reports@example.com>"
+EMAIL_FROM="MX SEG Scanner <reports@gtmreports.com>"
+EMAIL_REPLY_TO="matt@gtmreports.com"
 NEXT_PUBLIC_GITHUB_URL="https://github.com/your-org/mxscanner-csv"
 ```
+
+`EMAIL_FROM` and `EMAIL_REPLY_TO` default to the `gtmreports.com` values above.
+If you fork this, verify your own domain in Resend and override both — Resend
+rejects a `from` address on a domain you have not verified.
 
 ## Usage
 
@@ -90,7 +98,35 @@ dmarc_policy
 dmarc_record
 mx_scan_notes
 mx_scan_error
+mx_primary_host
+mx_provider_evidence
+seg_evidence_record_type
+seg_evidence_record
+dnssec_ad
+mta_sts_status
+tls_rpt_status
+bimi_status
+dkim_status
+dkim_selectors
 ```
+
+## DNS Queries Per Domain
+
+Each unique domain gets 14 DNS-over-HTTPS queries, all issued in parallel:
+
+```text
+MX                            inbound routing + SEG detection
+TXT                           SPF and provider TXT fingerprints
+_dmarc.{domain}               DMARC policy
+_mta-sts.{domain}             MTA-STS policy presence
+_smtp._tls.{domain}           TLS-RPT reporting
+default._bimi.{domain}        BIMI record
+{selector}._domainkey.{domain}  8 common DKIM selectors
+```
+
+DKIM selectors cannot be enumerated from DNS — they can only be guessed — so the
+probe list in `src/lib/dns-google.ts` covers common mailbox and ESP defaults.
+A missing selector means "not found on a common name", not "no DKIM".
 
 ## Provider Rules
 

@@ -10,7 +10,10 @@ export default function Home() {
           <span className="brand-mark">MX</span>
           <span>SEG Scanner</span>
         </a>
-        <a className="nav-link" href={githubUrl}>GitHub</a>
+        <span className="nav-links">
+          <a className="nav-link" href="/how-it-works">How it works</a>
+          <a className="nav-link" href={githubUrl}>GitHub</a>
+        </span>
       </nav>
 
       <section className="hero">
@@ -38,7 +41,9 @@ export default function Home() {
       </section>
 
       <footer>
-        <a href={githubUrl}>Open-source on GitHub</a>
+        <span>
+          <a href="/how-it-works">How it works</a> · <a href={githubUrl}>Open-source on GitHub</a>
+        </span>
         <span>DNS evidence only. Prefer unknown over incorrect.</span>
       </footer>
     </main>

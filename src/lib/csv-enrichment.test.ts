@@ -4,9 +4,13 @@ import type { DomainScanResult } from "./types";
 
 const proofpointResult: DomainScanResult = {
   domain: "example.com",
-  mx: { status: "present", records: ["10 mxa-001.pphosted.com"] },
+  mx: { status: "present", records: ["10 mxa-001.pphosted.com"], primaryHost: "mxa-001.pphosted.com" },
   spf: { status: "present", records: ["v=spf1 include:_spf.example.com -all"] },
   dmarc: { status: "present", policy: "reject", record: "v=DMARC1; p=reject" },
+  mtaSts: { status: "present", id: "20240101T000000" },
+  tlsRpt: { status: "missing" },
+  bimi: { status: "missing" },
+  dkim: { status: "present", selectors: ["selector1"] },
   classification: {
     inboundProvider: null,
     mailboxProvider: null,
@@ -42,6 +46,23 @@ describe("csv enrichment", () => {
     expect(output.csv).toContain("Invalid or missing email");
     expect(output.csv).toContain("mx_provider_evidence");
     expect(output.csv).toContain("Proofpoint high MX: 10 mxa-001.pphosted.com");
+  });
+
+  it("appends deliverability posture columns and rolls them up per domain", async () => {
+    const parsed = await parseCsv("email\njane@example.com\njohn@example.com\n");
+    const output = await buildEnrichedCsv(parsed, new Map([["example.com", proofpointResult]]));
+
+    expect(output.csv).toContain("mta_sts_status,tls_rpt_status,bimi_status,dkim_status,dkim_selectors");
+    expect(output.csv).toContain("mxa-001.pphosted.com,Proofpoint high MX");
+    expect(output.csv).toContain("present,missing,missing,present,selector1");
+    // Rollup counts unique domains, not the two rows that share one.
+    expect(output.summary.deliverability).toEqual({
+      dmarcEnforced: 1,
+      spfMissing: 0,
+      dkimFound: 1,
+      mtaStsFound: 1,
+      bimiFound: 0,
+    });
   });
 
   it("neutralizes formula-injection cells in output", async () => {
