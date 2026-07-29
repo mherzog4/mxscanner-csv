@@ -1,0 +1,42 @@
+src/lib/dns.test.ts
+  s_2eadf031bf0ea9::t_55f02014545ca3 56,67
+src/lib/domain-cache.test.ts
+  s_2eadf031bf0ea9::t_9e7e3c3ac888a0 47-67
+src/app/api/scan/route.ts
+  s_2eadf031bf0ea9::t_0520472386c5ff 19-27,89-90,96-104,112,118
+  s_2eadf031bf0ea9::t_55f02014545ca3 110,113
+src/lib/dns.ts
+  s_2eadf031bf0ea9::t_faf40db2a340ac 129-139,143,154,164-173
+  s_2eadf031bf0ea9::t_7741fb24a95d98 212,269-274,287-289
+src/lib/types.ts
+  s_2eadf031bf0ea9::t_91e0bbc5140338 65-67
+README.md
+  s_2eadf031bf0ea9::t_4971eb361f6132 87
+  s_2eadf031bf0ea9::t_a8b791a2ec94a0 197,213-223
+src/app/flow-diagram.tsx
+  s_2eadf031bf0ea9::t_4971eb361f6132 237
+src/app/upload-form.tsx
+  s_2eadf031bf0ea9::t_4971eb361f6132 53-59,63
+src/lib/rate-limit.test.ts
+  s_2eadf031bf0ea9::t_303ff6d998985e 30-32,34-35,37-38
+src/app/styles.css
+  s_2eadf031bf0ea9::t_4971eb361f6132 242-269
+src/lib/domain-cache.ts
+  s_2eadf031bf0ea9::t_55f02014545ca3 27-32,61,68,84,93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "30a1788963ca71a6c394185c79cb1b96e32e3ae7",
+  "prompts": {},
+  "sessions": {
+    "s_2eadf031bf0ea9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44fa907e-e5fc-4da8-a477-8d4370b97490",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Mherzog4 <matthewherzog4@gmail.com>"
+    }
+  }
+}
