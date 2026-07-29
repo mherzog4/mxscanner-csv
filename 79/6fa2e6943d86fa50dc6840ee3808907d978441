@@ -1,0 +1,41 @@
+src/lib/email.ts
+  s_2eadf031bf0ea9::t_7fd63be25f2997 90-103
+  s_2eadf031bf0ea9::t_cba442ce1526b1 39-42
+src/lib/types.ts
+  s_2eadf031bf0ea9::t_f56d6ee2c024aa 81
+src/lib/csv-enrichment.test.ts
+  s_2eadf031bf0ea9::t_a015e9970515e0 68-100
+README.md
+  s_2eadf031bf0ea9::t_fc533583ad75fa 23-26
+src/lib/provider-rules.ts
+  s_2eadf031bf0ea9::t_e400c7685e9d4f 50-104
+src/lib/csv-enrichment.ts
+  s_2eadf031bf0ea9::t_b138947af1a572 98-102
+  s_2eadf031bf0ea9::t_3ae8dbcf655294 142
+  s_2eadf031bf0ea9::t_f3b4322a0ea32e 83
+src/lib/detect-providers.test.ts
+  s_2eadf031bf0ea9::t_686768facb515b 50-65
+  s_2eadf031bf0ea9::t_ec2db3e8bcc6d7 27-49,66-67
+src/lib/detect-providers.ts
+  s_2eadf031bf0ea9::t_4cf0f2ea0b1694 42-50
+  s_2eadf031bf0ea9::t_4b351f8068ff31 69-70
+src/app/flow-diagram.tsx
+  s_2eadf031bf0ea9::t_0b29b86480375c 72-73
+  s_2eadf031bf0ea9::t_a363d4223ecf05 66,248
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "796fa2e6943d86fa50dc6840ee3808907d978441",
+  "prompts": {},
+  "sessions": {
+    "s_2eadf031bf0ea9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44fa907e-e5fc-4da8-a477-8d4370b97490",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Mherzog4 <matthewherzog4@gmail.com>"
+    }
+  }
+}
