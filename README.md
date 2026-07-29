@@ -129,6 +129,31 @@ The cache key carries a version (`mxscan:v1:{domain}`). Bump `CACHE_VERSION` in
 `src/lib/domain-cache.ts` whenever `DomainScanResult` gains a field, or old entries
 will keep serving rows missing the new columns.
 
+## Abuse Limits
+
+Two layers, because they catch different things.
+
+**Edge — Vercel WAF rate limit rule.** `POST /api/scan` is capped per IP before the
+function runs. Vercel does not bill for requests the WAF blocks, so this caps cost as
+well as abuse. It cannot see the request body, so it can only key on IP.
+
+**Application — `src/lib/rate-limit.ts`.** Enforces the per-recipient-email cap, which
+depends on a form field the edge never parses. Backed by Vercel's Runtime Cache so the
+counter is shared across function instances in a region.
+
+That app layer has real limitations, stated plainly:
+
+- **Not atomic.** Read-modify-write means simultaneous requests can read the same
+  count and both write `count + 1`, so a burst can slip a few over the cap.
+- **Per region, LRU-evictable.** A distributed client gets one bucket per region, and
+  entries can be evicted before the window closes.
+- **Fails open.** A cache error allows the request. Locking every visitor out of a free
+  tool because a cache blipped is the worse failure, and the edge rule still holds.
+
+Set `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` and the limiter switches to
+Upstash's atomic sliding window automatically — no code change. That is the upgrade
+path if the approximate counters ever stop being good enough.
+
 ## Enriched CSV Columns
 
 The output preserves every original row and column, then appends:
