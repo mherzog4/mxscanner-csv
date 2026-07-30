@@ -7,25 +7,27 @@ type StepKey = keyof typeof STEPS;
 const STEPS = {
   upload: {
     title: "Upload CSV + your email",
-    meta: "input · one form, two fields",
+    meta: "input · returns in seconds",
     body: (
       <>
-        Any prospect export works — Apollo, Clay, HubSpot, a raw list. You give the CSV and the address the finished
-        report should be delivered to. Nothing is stored server-side.
+        Any prospect export works — Apollo, Clay, HubSpot, a raw list. The upload is validated, stashed, and handed to a
+        background job, so the request comes back in about two seconds with a job id instead of holding the connection
+        open. You can close the tab; the report is emailed when the scan finishes.
       </>
     ),
-    code: "POST /api/scan\n  file:  prospects.csv  (≤25 MB)\n  email: you@company.com",
+    code: "POST /api/scan\n  file:  prospects.csv  (≤25 MB, ≤25,000 rows)\n  email: you@company.com\n\n202 { runId } — job runs in the background",
   },
   guard: {
     title: "Bot + abuse checks",
     meta: "route.ts · runs before anything else",
     body: (
       <>
-        Vercel BotID blocks automated requests, then two durable rate limits: 5 scans per IP per hour and 3 reports per
-        recipient email per day. Free tools get scraped; this one defends itself.
+        A firewall rule caps requests per IP at the edge before the function even runs, so abuse costs nothing. Then
+        BotID blocks automated requests, and two durable counters enforce 5 scans per IP per hour and 3 reports per
+        recipient email per day. The per-email cap has to live in the app — the edge cannot read a form field.
       </>
     ),
-    code: "checkBotId()\ncheckRateLimit(`scan:${ip}`, 5, 1h)\ncheckRateLimit(`report:${email}`, 3, 24h)",
+    code: "WAF: 10 req/hour per IP on POST /api/scan\ncheckBotId()\ncheckRateLimit(`scan:${ip}`, 5, 1h)\ncheckRateLimit(`report:${email}`, 3, 24h)",
   },
   parse: {
     title: "Parse + validate CSV",
@@ -44,23 +46,25 @@ const STEPS = {
     body: (
       <>
         25,000 prospects usually share far fewer companies. DNS is per-domain, not per-person — so the scanner
-        extracts each address&apos;s domain, lowercases it, and scans the unique set once (max 500).
+        extracts each address&apos;s domain, lowercases it, and scans the unique set once. Results are cached for 12
+        hours, so domains another upload already covered cost nothing at all.
       </>
     ),
     code: "acme.com   × 40 rows → 1 lookup\nglobex.io  × 12 rows → 1 lookup\n...",
   },
   dns: {
-    title: "DNS scan per domain",
+    title: "DNS scan · 800 domains per step",
     meta: "2 DoH resolvers · 60 workers · 10s timeout",
     body: (
       <>
-        Fourteen queries fire in parallel for every domain over DNS-over-HTTPS: MX, TXT (for SPF),{" "}
-        <code>_dmarc</code>, <code>_mta-sts</code>, <code>_smtp._tls</code>, <code>default._bimi</code>, and eight
-        common DKIM selectors. A worker pool of 20 keeps the whole batch to a couple of minutes. A dead domain
-        can&apos;t hang the run — it times out and gets marked as an error row.
+        Six queries fire in parallel per domain over DNS-over-HTTPS: MX, TXT (for SPF), <code>_dmarc</code>,{" "}
+        <code>_mta-sts</code>, <code>_smtp._tls</code> and <code>default._bimi</code> — fourteen if you tick DKIM,
+        which adds eight selector probes. Queries alternate between Google and Cloudflare so neither absorbs the whole
+        scan. Measured on a deployment: 75 domains a second, and a dead domain times out and gets marked rather than
+        hanging the run.
       </>
     ),
-    code: "GET dns.google/resolve?name=acme.com&type=MX\nGET dns.google/resolve?name=acme.com&type=TXT\nGET dns.google/resolve?name=_dmarc.acme.com&type=TXT\nGET dns.google/resolve?name=_mta-sts.acme.com&type=TXT\nGET dns.google/resolve?name=selector1._domainkey.acme.com&type=TXT",
+    code: "per domain, in parallel:\n  MX  TXT  _dmarc  _mta-sts  _smtp._tls  default._bimi\n\nGET dns.google/resolve?name=acme.com&type=MX\nGET cloudflare-dns.com/dns-query?name=beta.com&type=MX\n  (domains alternate between resolvers)",
   },
   rules: {
     title: "Match 24 provider rules",
@@ -122,11 +126,13 @@ const STEPS = {
   },
   send: {
     title: "Email the CSV back",
-    meta: "Resend · attachment + summary",
+    meta: "Resend · final step of the job",
     body: (
       <>
-        The enriched CSV arrives as an attachment with a summary: total rows, unique domains, a count per detected
-        provider, and a deliverability rollup. No dashboard to log into — the deliverable lands where you already work.
+        The enriched CSV arrives as an attachment with a summary: rows, unique domains, a breakdown by gateway and by
+        mailbox provider, and a deliverability rollup. If the file would exceed the 40 MB an email can carry, the
+        summary is sent with an explanation instead of silently failing. No dashboard to log into — the deliverable
+        lands where you already work.
       </>
     ),
     code: "mx-seg-enriched-prospects-2026-07-29.csv\n\nProofpoint: 84 · Mimecast: 31\nGoogle Workspace: 210 · Unknown: 96\n312/421 domains enforce DMARC",
@@ -216,7 +222,7 @@ export function FlowDiagram() {
             <FlowNode k="upload" className="term" {...nodeProps}>
               <rect x="210" y="12" width="200" height="44" />
               <text x="310" y="32" textAnchor="middle">Upload CSV + your email</text>
-              <text className="sub" x="310" y="47" textAnchor="middle">up to 25,000 prospect rows</text>
+              <text className="sub" x="310" y="47" textAnchor="middle">≤25,000 rows · returns in ~2s</text>
             </FlowNode>
 
             <FlowNode k="guard" {...nodeProps}>
@@ -239,8 +245,8 @@ export function FlowDiagram() {
 
             <FlowNode k="dns" {...nodeProps}>
               <rect x="210" y="344" width="200" height="48" />
-              <text x="310" y="364" textAnchor="middle">DNS scan per domain</text>
-              <text className="sub" x="310" y="380" textAnchor="middle">MX · SPF · DMARC · MTA-STS · DKIM</text>
+              <text x="310" y="364" textAnchor="middle">DNS scan · 800 per step</text>
+              <text className="sub" x="310" y="380" textAnchor="middle">6 queries · DKIM optional (+8)</text>
             </FlowNode>
 
             <FlowNode k="rules" {...nodeProps}>
@@ -275,7 +281,7 @@ export function FlowDiagram() {
             <FlowNode k="send" {...nodeProps}>
               <rect x="210" y="822" width="200" height="48" />
               <text x="310" y="842" textAnchor="middle">Email the CSV back</text>
-              <text className="sub" x="310" y="858" textAnchor="middle">Resend · summary + attachment</text>
+              <text className="sub" x="310" y="858" textAnchor="middle">Resend · when the job finishes</text>
             </FlowNode>
 
             <FlowNode k="done" className="ok term" {...nodeProps}>
