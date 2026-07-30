@@ -1,0 +1,31 @@
+src/lib/email.test.ts
+  s_2eadf031bf0ea9::t_a4495b13b43f71 1-47
+README.md
+  s_2eadf031bf0ea9::t_304f204d7ca5d1 87,90,92,95-97,99-109,112-113,115-118
+src/lib/email.ts
+  s_2eadf031bf0ea9::t_19e599b3d5fd4c 21,27-30,55-59,76-85
+src/lib/scan-workflow.ts
+  s_2eadf031bf0ea9::t_19e599b3d5fd4c 30-34,88-93,99
+src/app/flow-diagram.tsx
+  s_2eadf031bf0ea9::t_efa08e2f98d703 237
+src/app/api/scan/route.ts
+  s_2eadf031bf0ea9::t_efa08e2f98d703 18,20-22,24-38
+src/app/upload-form.tsx
+  s_2eadf031bf0ea9::t_efa08e2f98d703 111,121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "a4012facbcd090b3930250684f1fd3f93996ba88",
+  "prompts": {},
+  "sessions": {
+    "s_2eadf031bf0ea9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44fa907e-e5fc-4da8-a477-8d4370b97490",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Mherzog4 <matthewherzog4@gmail.com>"
+    }
+  }
+}
