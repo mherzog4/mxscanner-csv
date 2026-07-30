@@ -84,30 +84,38 @@ If none of those headers exist, the scanner attempts to detect email-like values
 
 - Max file size: 25 MB
 - Max rows: 25,000
-- Max unique domains: 10,000 (4,000 with DKIM probing)
+- Max unique domains: 25,000 (10,000 with DKIM probing)
 - DNS concurrency: 60
 
-The domain cap comes from a measured run on a deployment:
+Every figure below is from a run on a deployment:
 
-| Domains | Wall clock | Rate | Notes |
+| Domains | Wall clock | Rate | Per chunk |
 |---|---|---|---|
 | 5,000 | **failed** | — | old synchronous path, died at the 300s request limit |
-| 3,480 | 53s | 39/sec | workflow, 5 chunks |
-| 10,000 | 168s | 60/sec | workflow, 13 chunks, 13s avg/step vs 120s budget |
+| 3,480 | 53s | 66/sec | 11s |
+| 10,000 | 168s | 60/sec | 13s |
+| 25,000 | 333s (5.5 min) | 75/sec | 10s |
 
-Throughput per domain is *higher* at 10,000 than at 3,480 because each chunk is a
-separate invocation, so the progressive resolver throttling that punished one
-long-running request no longer accumulates across a whole job. Chunking bought headroom
-as well as removing the ceiling.
+Scaling is linear — the rate does not degrade with job size. Each chunk is a separate
+invocation, so resolver throttling never accumulates across a job. Per-chunk time stays
+around 10s against a 120s step budget.
+
+25,000 equals `MAX_ROWS`, so the domain cap is no longer a real constraint: a CSV cannot
+hold more unique domains than rows. The binding limits are now elsewhere:
+
+- **Resend's 40MB message cap.** `finalizeJob` checks the encoded size and, if the file
+  will not fit, sends the summary with an explanation instead of the attachment. A
+  completed scan should not vanish because the file was too big.
+- **How long someone will wait for an email.** 5.5 minutes at 25,000 domains.
 
 An earlier version of this file justified a 10,000 cap from a laptop benchmark of
-~320 domains/sec. That number did not transfer and a production job died. The figures
-above are all from deployed runs — do not substitute local DNS throughput for them.
+~320 domains/sec. That number did not transfer and a production job died with nothing
+delivered. Do not substitute local DNS throughput for deployed measurement.
 
-The DKIM cap (4,000) is derived from the query-cost ratio rather than measured directly.
-That is acceptable now in a way it was not before: a chunk that runs long returns its
-remaining domains marked, so an optimistic cap degrades into a partial report rather
-than losing the job.
+The DKIM cap (10,000) is derived rather than measured: 10,000 domains with DKIM is
+140,000 queries, just under the 150,000 the measured 25,000-domain run issued. Deriving
+is acceptable here because a long-running chunk returns its remaining domains marked, so
+an optimistic cap degrades into a partial report instead of losing the job.
 
 `maxDuration` is 300s, the Fluid Compute default and the Hobby ceiling. Pro and
 Enterprise can raise it to 800s.
