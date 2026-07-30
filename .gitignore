@@ -9,3 +9,7 @@ coverage/
 .playwright-mcp
 .env*
 /.swc
+
+# Local marketing assets, not build output — social image source and its render.
+linkedin-1080.html
+linkedin-1080.png
