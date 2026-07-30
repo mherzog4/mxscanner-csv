@@ -15,28 +15,33 @@ export const maxDuration = 60;
 const MAX_FILE_BYTES = 25_000_000;
 const MAX_ROWS = 25_000;
 
-// Measured on a deployment, not extrapolated. A 10,000-domain job completed in 168s
-// (~60 domains/sec) across 13 chunk steps, averaging 13s per step against a 120s step
-// budget — roughly 9x headroom. The old synchronous path died at 5,000.
+// All measured on deployments, not extrapolated:
 //
-// Throughput per domain is *higher* at 10,000 than it was at 3,480 (60/sec vs 39/sec)
-// because each chunk is a separate invocation, so the progressive resolver throttling
-// that punished one long-running request no longer accumulates across the whole job.
+//    3,480 domains    53s    66/sec    11s per chunk
+//   10,000 domains   168s    60/sec    13s per chunk
+//   25,000 domains   333s    75/sec    10s per chunk
 //
-// The DKIM cap is derived from the query-cost ratio (14 vs 6 per domain) rather than
-// measured directly. That is safe here in a way it was not before: a chunk that runs
-// long now returns its remaining domains marked, so an optimistic cap degrades into a
-// partial report instead of losing the job.
-const MAX_UNIQUE_DOMAINS_WITH_DKIM = 4_000;
-const MAX_UNIQUE_DOMAINS = 10_000;
+// Scaling is linear — the rate does not degrade with size, because each chunk is a
+// separate invocation so resolver throttling never accumulates across a job. Per-chunk
+// time stays ~10s against a 120s step budget. The old synchronous path died at 5,000.
+//
+// 25,000 equals MAX_ROWS, so the domain cap is no longer a real constraint: a CSV cannot
+// hold more unique domains than rows. Raising throughput further now means raising
+// MAX_ROWS, and the binding limits are elsewhere (Resend's 40MB message cap, and how
+// long someone will wait for an email — 5.5 minutes at this size).
+//
+// The DKIM cap is derived, not measured: 10,000 domains with DKIM is 140,000 queries,
+// just under the 150,000 the measured 25,000-domain run issued. Safe to derive here
+// because a long-running chunk returns its remaining domains marked, so an optimistic
+// cap degrades into a partial report rather than losing the job.
+const MAX_UNIQUE_DOMAINS_WITH_DKIM = 10_000;
+const MAX_UNIQUE_DOMAINS = 25_000;
 const SCAN_CONCURRENCY = 60;
 
 // Leaves ~60s of the 300s function budget for parsing, CSV generation and the Resend
 // upload. A run that outgrows this returns a report with the unreached domains marked
 // rather than being killed mid-flight and delivering nothing.
 const SCAN_BUDGET_MS = 240_000;
-// Resend's hard limit is 40 MB post-base64; leave room for the HTML body.
-const MAX_ATTACHMENT_BYTES = 38_000_000;
 
 export async function POST(request: Request) {
   try {

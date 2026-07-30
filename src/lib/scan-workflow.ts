@@ -27,6 +27,11 @@ const STEP_BUDGET_MS = 120_000;
 
 const BLOB = { access: "private" } as const;
 
+// Resend caps a message at 40MB after base64, which inflates by 4/3. Leave room for the
+// HTML body. This guard lived in the route before scanning moved to a workflow and was
+// lost in the move — a large report failed opaquely at the very end of a job instead.
+const MAX_ATTACHMENT_BYTES = 38_000_000;
+
 function chunk<T>(items: T[], size: number) {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
@@ -80,11 +85,18 @@ async function finalizeJob(job: ScanJob, chunkPaths: string[]) {
   const parsed = await parseCsv(await readBlobText(job.csvPathname));
   const enriched = await buildEnrichedCsv(parsed, new Map(entries));
 
+  const encodedBytes = Math.ceil(Buffer.byteLength(enriched.csv, "utf8") / 3) * 4;
+  const oversized = encodedBytes > MAX_ATTACHMENT_BYTES;
+  if (oversized) {
+    console.error(`Job ${job.id}: enriched CSV is ${encodedBytes} bytes encoded, sending summary only`);
+  }
+
   await sendReportEmail({
     to: job.email,
     csv: enriched.csv,
     fileName: job.fileName,
     summary: enriched.summary,
+    oversized,
   });
   await addContact(job.email);
 

@@ -18,11 +18,16 @@ export async function sendReportEmail({
   csv,
   fileName,
   summary,
+  oversized = false,
 }: {
   to: string;
   csv: string;
   fileName: string;
   summary: EnrichmentSummary;
+  // Resend rejects a message over 40MB post-base64. When the enriched CSV crosses that,
+  // the findings still went to the trouble of being computed — so send the summary and
+  // say why the file is missing, rather than failing a completed job silently.
+  oversized?: boolean;
 }) {
   if (!process.env.RESEND_API_KEY) {
     throw new Error("RESEND_API_KEY is not configured");
@@ -47,7 +52,11 @@ export async function sendReportEmail({
         <li>${dkimFound} of ${domains} domains publish DKIM on a common selector</li>
         <li>${mtaStsFound} publish MTA-STS · ${bimiFound} publish BIMI</li>
       </ul>
-      <p>The enriched CSV is attached. Provider detection is confidence-scored from public DNS evidence.</p>
+      ${
+        oversized
+          ? `<p><strong>The enriched CSV was too large to email</strong> (over 40 MB once encoded), so only this summary was sent. Split the list into smaller batches and scan them separately to get the file.</p>`
+          : `<p>The enriched CSV is attached. Provider detection is confidence-scored from public DNS evidence.</p>`
+      }
       <p style="color:#6b7280; font-size: 13px;">
         Questions, or a provider we misread? This address doesn't take replies —
         reach me on <a href="${LINKEDIN_URL}" style="color:#1f6f4a;">LinkedIn</a>
@@ -64,12 +73,16 @@ export async function sendReportEmail({
     subject: "Your prospect email security gateway report is ready",
     html,
     headers: { "X-Entity-Ref-ID": randomUUID() },
-    attachments: [
-      {
-        filename: fileName,
-        content: Buffer.from(csv, "utf8").toString("base64"),
-      },
-    ],
+    ...(oversized
+      ? {}
+      : {
+          attachments: [
+            {
+              filename: fileName,
+              content: Buffer.from(csv, "utf8").toString("base64"),
+            },
+          ],
+        }),
   });
 
   if (error) throw new Error(error.message);
